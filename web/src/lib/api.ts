@@ -1,0 +1,181 @@
+import { useMutation, useQuery, UseQueryOptions } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { ApiResponse, Category, PaginatedSpecs, SpecDetail, Tag } from '../types/spec';
+
+/**
+ * API base: defaults to '/specmarket/v1' for local dev with Vite proxy.
+ * You can override via VITE_API_BASE (e.g., 'http://localhost:5000/specmarket/v1').
+ */
+export const API_BASE: string = (import.meta as any)?.env?.VITE_API_BASE || '/specmarket/v1';
+
+/** Build URL with query params against API_BASE */
+const buildUrl = (path: string, params?: Record<string, string | number | boolean | undefined | null>) => {
+  const cleanPath = path.replace(/^\/+/, '');
+  const url = new URL(`${API_BASE}/${cleanPath}`, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.set(key, String(value));
+      }
+    });
+  }
+  return url.toString();
+};
+
+/** Generic JSON fetcher that unwraps { data, error } envelope */
+async function fetchJson<T>(path: string, params?: Record<string, string | number | boolean | undefined | null>): Promise<T> {
+  const response = await fetch(buildUrl(path, params), { credentials: 'include' });
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      message = body?.error?.message || message;
+    } catch { /* ignore body parse errors */ }
+    throw new Error(message);
+  }
+  const json = (await response.json()) as ApiResponse<T>;
+  return json.data;
+}
+
+/** -------- Health & Ping (IMPORTANT: /healthz has NO /specmarket/v1 prefix) -------- */
+const HEALTHZ_PATH = '/healthz';
+
+/** GET /healthz (no API_BASE prefix) */
+export async function healthz(): Promise<Record<string, unknown>> {
+  const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+  const url = new URL(HEALTHZ_PATH, base).toString();
+  const r = await fetch(url, { credentials: 'include' });
+  if (!r.ok) throw new Error(`healthz failed: ${r.status}`);
+  // Some servers may return empty body; normalize to {}
+  try {
+    return (await r.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/** GET /specmarket/v1/ping */
+export async function ping(): Promise<Record<string, unknown>> {
+  const r = await fetch(buildUrl('ping'), { credentials: 'include' });
+  if (!r.ok) throw new Error(`ping failed: ${r.status}`);
+  try {
+    return (await r.json()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/** -------------------- Queries -------------------- */
+
+export type ListSpecParams = {
+  page?: number;
+  pageSize?: number;
+  tag?: string;
+  category?: string;
+  order?: 'latest' | 'popular' | 'updated' | string;
+  filter?: string;
+  q?: string;
+  updatedSince?: string;
+};
+
+/** List specs with pagination & filters */
+export const useSpecs = (
+  params: ListSpecParams,
+  options?: UseQueryOptions<PaginatedSpecs>
+) => {
+  const queryKey = useMemo(() => ['specs', params], [params]);
+  return useQuery({
+    queryKey,
+    queryFn: () => fetchJson<PaginatedSpecs>('listSpecs', params),
+    ...options,
+  });
+};
+
+/** Categories */
+export const useCategories = () =>
+  useQuery({
+    queryKey: ['categories'],
+    queryFn: () => fetchJson<{ items: Category[] }>('listCategories'),
+  });
+
+/** Tags */
+export const useTags = () =>
+  useQuery({
+    queryKey: ['tags'],
+    queryFn: () => fetchJson<{ items: Tag[] }>('listTags'),
+  });
+
+/** Spec detail by slug */
+export const useSpecDetail = (slug: string) =>
+  useQuery({
+    queryKey: ['spec', slug],
+    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { slug }),
+    enabled: Boolean(slug),
+  });
+
+/** Specs by category */
+export const useSpecsByCategory = (slug: string) =>
+  useQuery({
+    queryKey: ['category', slug],
+    queryFn: () => fetchJson<PaginatedSpecs>('getCategorySpecs', { slug }),
+    enabled: Boolean(slug),
+  });
+
+/** Specs by tag */
+export const useSpecsByTag = (slug: string) =>
+  useQuery({
+    queryKey: ['tag', slug],
+    queryFn: () => fetchJson<PaginatedSpecs>('getTagSpecs', { slug }),
+    enabled: Boolean(slug),
+  });
+
+/** -------------------- Utilities -------------------- */
+
+/** Download markdown as a file (opens new tab) */
+export const downloadMarkdown = (slug: string) => {
+  window.open(buildUrl('downloadSpec', { slug }), '_blank');
+};
+
+/** Copy raw markdown to clipboard */
+export const copyMarkdown = async (slug: string) => {
+  const response = await fetch(buildUrl('getSpecRaw', { slug }), { credentials: 'include' });
+  if (!response.ok) throw new Error('Failed to fetch markdown');
+  const text = await response.text();
+  await navigator.clipboard.writeText(text);
+  return text;
+};
+
+/** -------------------- Mutations -------------------- */
+
+type UploadPayload = {
+  token: string;          // Admin token (X-Admin-Token)
+  formData: FormData;     // Must contain the file and metadata fields the backend expects
+};
+
+/** POST /specmarket/v1/uploadSpec */
+export const useUploadSpec = () =>
+  useMutation(async (payload: UploadPayload) => {
+    const response = await fetch(buildUrl('uploadSpec'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'X-Admin-Token': payload.token,
+      },
+      body: payload.formData,
+    });
+    if (!response.ok) {
+      try {
+        const err = await response.json();
+        throw new Error(err?.error?.message || 'Upload failed');
+      } catch {
+        throw new Error('Upload failed');
+      }
+    }
+    const json = (await response.json()) as ApiResponse<{ id: string; slug: string }>;
+    return json.data;
+  });
+
+/** Build app route (not API) for spec detail page */
+export const buildSpecLink = (slug: string) => `/specs/${slug}`;
+
+export type { Category, Tag, PaginatedSpecs, SpecDetail };

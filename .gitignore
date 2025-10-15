@@ -1,0 +1,8 @@
+**/__pycache__/
+*.pyc
+node_modules/
+web/node_modules/
+web/dist/
+.pytest_cache/
+*.tsbuildinfo
+.env
