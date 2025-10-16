@@ -6,3 +6,5 @@ web/dist/
 .pytest_cache/
 *.tsbuildinfo
 .env
+.DS_Store
+req/.DS_Store

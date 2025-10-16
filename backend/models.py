@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import IntEnum, unique
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, validator
 
 
 @unique
 class BusinessErrorCode(IntEnum):
+    SUCCESS = 0
     INVALID_ARG = 1001
     NOT_FOUND = 1004
     UNAUTHORIZED = 1003
@@ -20,6 +21,7 @@ class BusinessErrorCode(IntEnum):
 
 
 _ERROR_MESSAGES = {
+    BusinessErrorCode.SUCCESS: "success",
     BusinessErrorCode.INVALID_ARG: "Invalid argument",
     BusinessErrorCode.NOT_FOUND: "Resource not found",
     BusinessErrorCode.UNAUTHORIZED: "Unauthorized",
@@ -91,4 +93,31 @@ class UploadPayload(BaseModel):
     summary: str
     tags: List[str]
     version: int = 1
+
+
+class APIResponse(BaseModel):
+    status_code: int
+    status_msg: str
+    data: Dict[str, Any]
+
+    @classmethod
+    def success(cls, data: Optional[Dict[str, Any]] = None) -> "APIResponse":
+        return cls(
+            status_code=BusinessErrorCode.SUCCESS.value,
+            status_msg=BusinessErrorCode.SUCCESS.default_message,
+            data=data or {},
+        )
+
+    @classmethod
+    def from_error(
+        cls,
+        code: BusinessErrorCode,
+        message: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> "APIResponse":
+        return cls(
+            status_code=code.value,
+            status_msg=message or code.default_message,
+            data=data or {},
+        )
 

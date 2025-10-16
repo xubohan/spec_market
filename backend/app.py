@@ -13,7 +13,7 @@ from flask_caching import Cache
 from flask_cors import CORS
 
 from .config import settings
-from .models import BusinessErrorCode, Spec, UploadPayload
+from .models import APIResponse, BusinessErrorCode, Spec, UploadPayload
 from .repository import repository
 from .utils import compute_etag, http_datetime, render_markdown, build_toc
 
@@ -38,11 +38,7 @@ def create_app() -> Flask:
         return response
 
     def response_payload(data: Optional[Dict[str, Any]] = None, status: int = 200) -> Response:
-        payload = {
-            "status_code": 0,
-            "status_msg": "success",
-            "data": data or {},
-        }
+        payload = APIResponse.success(data=data).dict()
         response = make_response(json.dumps(payload, default=str), status)
         response.headers["Content-Type"] = "application/json"
         return response
@@ -56,11 +52,7 @@ def create_app() -> Flask:
         error_data: Dict[str, Any] = {"traceId": g.get("trace_id", "")}
         if extra_data:
             error_data.update(extra_data)
-        payload = {
-            "status_code": code.value,
-            "status_msg": message or code.default_message,
-            "data": error_data,
-        }
+        payload = APIResponse.from_error(code, message=message, data=error_data).dict()
         response = make_response(json.dumps(payload), status)
         response.headers["Content-Type"] = "application/json"
         return response
