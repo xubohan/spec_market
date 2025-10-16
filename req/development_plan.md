@@ -7,6 +7,7 @@
 * 详情页仅 **Overview**（Markdown 渲染），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
+* 前端从所有 API 统一接收 `{ status_code, status_msg, data }` 包装结构；仅当 `status_code === 0` 视为成功。
 
 ---
 
@@ -22,7 +23,7 @@
 * **Markdown 渲染**：remark/rehype + `remark-gfm`、`remark-slug`、`rehype-autolink-headings`、`rehype-sanitize`
 * **代码高亮**：Prism.js（主题：One Light / GitHub Light）
 * **表单与校验**：React Hook Form + zod（仅后台页会用到，MVP可极简）
-* **环境变量**：`VITE_API_BASE`（如 `https://spec.example.com/api`）
+* **环境变量**：`VITE_API_BASE`（如 `https://spec.example.com/api`）；本地开发通过 Vite 代理把 `5173` 端口请求转发至后端 `5000`（与后端 `PORT` 环境变量保持一致）。
 
 **目录建议**
 
@@ -266,6 +267,8 @@ Spec {
 
 ## REST API 设计（公开读）
 
+* 全部 JSON 响应（含错误）使用统一包装：`{ status_code: number, status_msg: string, data: object }`。`status_code === 0` 表示成功，`status_msg` 描述状态，`data` 携带实际载荷（最少为空对象 `{}`）。
+
 ### 1) 列表/搜索
 
 `GET /api/specs`
@@ -277,13 +280,17 @@ Spec {
 
 ```json
 {
-  "items": [
-    { "title":"...", "slug":"...", "summary":"...", "tags":["..."], "category":"...", "updatedAt":"2025-10-12T08:00:00Z" }
-  ],
-  "page": 1,
-  "pageSize": 20,
-  "total": 123,
-  "hasMore": true
+  "status_code": 0,
+  "status_msg": "OK",
+  "data": {
+    "items": [
+      { "title":"...", "slug":"...", "summary":"...", "tags":["..."], "category":"...", "updatedAt":"2025-10-12T08:00:00Z" }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "total": 123,
+    "hasMore": true
+  }
 }
 ```
 
@@ -293,15 +300,19 @@ Spec {
 
 ```json
 {
-  "title":"Amap Maps",
-  "slug":"amap-maps",
-  "category":"maps",
-  "tags":["maps","location-services"],
-  "toc":[{"text":"Overview","id":"overview","level":2}],
-  "contentMd":"...",            // 当 format=md/both
-  "contentHtml":"...",          // 当 format=html/both
-  "updatedAt":"2025-10-12T08:00:00Z",
-  "version": 3
+  "status_code": 0,
+  "status_msg": "OK",
+  "data": {
+    "title":"Amap Maps",
+    "slug":"amap-maps",
+    "category":"maps",
+    "tags":["maps","location-services"],
+    "toc":[{"text":"Overview","id":"overview","level":2}],
+    "contentMd":"...",            // 当 format=md/both
+    "contentHtml":"...",          // 当 format=html/both
+    "updatedAt":"2025-10-12T08:00:00Z",
+    "version": 3
+  }
 }
 ```
 
@@ -317,7 +328,7 @@ Spec {
 `GET /api/specs/:slug/raw`
 
 * `Content-Type: text/plain; charset=utf-8`
-* 直接返回 `contentMd`（若不存在返回 404）
+* 直接返回 `contentMd`（若不存在返回 404，错误响应仍遵循 `{ status_code, status_msg, data }` 结构，`data` 可为空对象）
 
 ### 4) 下载 Markdown
 
@@ -336,11 +347,32 @@ Spec {
   * `title`、`slug`、`category`、`summary`、`tags`、`version`
   * `content`（纯文本 Markdown，可选）
   * `file`（Markdown 文件，可选；当 `content` 为空时必填）
-* 成功返回 `201 { id, slug }`
-* 失败返回标准错误模型（401/400 等）
+* 成功返回 `201` + `{ "status_code": 0, "status_msg": "Created", "data": { "id": "...", "slug": "..." } }`
+* 失败返回标准错误模型（401/400 等），错误响应同样包装在 `{ status_code, status_msg, data }` 中，`data` 至少为空对象或包含字段错误详情。
 
-`GET /api/categories` → `[{ "name":"backend","slug":"backend","count":23 }]`
-`GET /api/tags` → `[{ "name":"coupon","slug":"coupon","count":12 }]`
+`GET /api/categories` →
+
+```json
+{
+  "status_code": 0,
+  "status_msg": "OK",
+  "data": {
+    "items": [{ "name": "backend", "slug": "backend", "count": 23 }]
+  }
+}
+```
+
+`GET /api/tags` →
+
+```json
+{
+  "status_code": 0,
+  "status_msg": "OK",
+  "data": {
+    "items": [{ "name": "coupon", "slug": "coupon", "count": 12 }]
+  }
+}
+```
 
 > **写接口（保留不上线）**
 > `POST /api/specs`、`PUT /api/specs/:id`（需要 `X-Admin-Token` + `version` 乐观锁）
@@ -372,11 +404,17 @@ Spec {
 ## 错误模型
 
 ```json
-{ "error": { "code": "NOT_FOUND|INVALID_ARG|INTERNAL", "message": "说明", "traceId": "req-..." } }
+{
+  "status_code": 400,
+  "status_msg": "INVALID_ARG",
+  "data": {
+    "error": { "code": "NOT_FOUND|INVALID_ARG|INTERNAL", "message": "说明", "traceId": "req-..." }
+  }
+}
 ```
 
 * 记录 `traceId`（响应头也返回，便于排障）
-* 对 5xx 统一掩码为 `INTERNAL`，日志保留详细堆栈
+* 对 5xx 统一掩码为 `INTERNAL`（`status_code` 置为 500），日志保留详细堆栈
 
 ---
 
