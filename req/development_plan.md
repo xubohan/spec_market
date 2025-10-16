@@ -2,8 +2,11 @@
 
 ## 目标与范围（MVP）
 
+> 在以下规划确认无误后，再启动具体代码实现工作。
+
 * 左侧主导航仅 **Home / Categories / Tags**，风格贴近 mcp.so。
 * **Upload** 作为临时管理入口，允许内网成员通过 Admin-Token 上传 `spec.md`（支持文本或文件）。
+  * Upload 表单限定仅接受 `.md` 文件：文件选择器设置 `accept=".md,text/markdown"`，提交前追加校验防止非 Markdown 文件被上传。
 * 详情页仅 **Overview**（Markdown 渲染），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
@@ -322,6 +325,7 @@ Spec {
 * 上传表单包含：标题、Slug、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
 * 成功上传后清空表单并提示 `Upload successful for <slug>`。
 * 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<slug>.md` 并存储 HTML、TOC。
+* 当前上传端点保持宽松：后端仍接受任意文件类型，依赖前端的 `.md` 限制；若后续需要可在 Flask 层再加 MIME/扩展名校验。
 
 ### 3) 获取原文（复制）
 
