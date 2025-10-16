@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useAdminToken } from '../lib/auth';
-import { useUploadSpec } from '../lib/api';
+import { ApiRequestError, useUploadSpec } from '../lib/api';
 
 export const UploadPage = () => {
   const { token, setToken } = useAdminToken();
@@ -25,7 +25,11 @@ export const UploadPage = () => {
       setMessage(`Upload successful for ${result.slug}`);
       event.currentTarget.reset();
     } catch (error) {
-      setMessage((error as Error).message);
+      if (error instanceof ApiRequestError) {
+        setMessage(error.statusMsg);
+      } else {
+        setMessage((error as Error).message);
+      }
     }
   };
 

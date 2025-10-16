@@ -2,6 +2,18 @@ import { useMutation, useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ApiResponse, Category, PaginatedSpecs, SpecDetail, Tag } from '../types/spec';
 
+export class ApiRequestError extends Error {
+  statusCode: number;
+  statusMsg: string;
+
+  constructor(statusCode: number, statusMsg: string) {
+    super(statusMsg || `API error ${statusCode}`);
+    this.name = 'ApiRequestError';
+    this.statusCode = statusCode;
+    this.statusMsg = statusMsg || `API error ${statusCode}`;
+  }
+}
+
 /**
  * API base: defaults to '/specmarket/v1' for local dev with Vite proxy.
  * You can override via VITE_API_BASE (e.g., 'http://localhost:5000/specmarket/v1').
@@ -22,19 +34,39 @@ const buildUrl = (path: string, params?: Record<string, string | number | boolea
   return url.toString();
 };
 
-/** Generic JSON fetcher that unwraps { data, error } envelope */
+const extractApiData = async <T>(response: Response): Promise<T> => {
+  let payload: ApiResponse<T> | null = null;
+
+  try {
+    payload = (await response.json()) as ApiResponse<T>;
+  } catch (error) {
+    if (!response.ok) {
+      throw new ApiRequestError(response.status, `HTTP ${response.status}`);
+    }
+    throw new Error('Failed to parse API response');
+  }
+
+  if (!payload || typeof payload.status_code !== 'number') {
+    throw new Error('Invalid API response payload');
+  }
+
+  const statusMsg = payload.status_msg ?? '';
+
+  if (!response.ok) {
+    throw new ApiRequestError(payload.status_code, statusMsg || `HTTP ${response.status}`);
+  }
+
+  if (payload.status_code !== 0) {
+    throw new ApiRequestError(payload.status_code, statusMsg || `API error ${payload.status_code}`);
+  }
+
+  return payload.data;
+};
+
+/** Generic JSON fetcher that unwraps { status_code, status_msg, data } envelope */
 async function fetchJson<T>(path: string, params?: Record<string, string | number | boolean | undefined | null>): Promise<T> {
   const response = await fetch(buildUrl(path, params), { credentials: 'include' });
-  if (!response.ok) {
-    let message = `HTTP ${response.status}`;
-    try {
-      const body = await response.json();
-      message = body?.error?.message || message;
-    } catch { /* ignore body parse errors */ }
-    throw new Error(message);
-  }
-  const json = (await response.json()) as ApiResponse<T>;
-  return json.data;
+  return extractApiData<T>(response);
 }
 
 /** -------- Health & Ping (IMPORTANT: /healthz has NO /specmarket/v1 prefix) -------- */
@@ -163,16 +195,7 @@ export const useUploadSpec = () =>
       },
       body: payload.formData,
     });
-    if (!response.ok) {
-      try {
-        const err = await response.json();
-        throw new Error(err?.error?.message || 'Upload failed');
-      } catch {
-        throw new Error('Upload failed');
-      }
-    }
-    const json = (await response.json()) as ApiResponse<{ id: string; slug: string }>;
-    return json.data;
+    return extractApiData<{ id: string; slug: string }>(response);
   });
 
 /** Build app route (not API) for spec detail page */

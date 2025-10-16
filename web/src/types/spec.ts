@@ -37,14 +37,12 @@ export type Category = {
 export type Tag = Category;
 
 export type ApiResponse<T> = {
+  status_code: number;
+  status_msg: string;
   data: T;
-  traceId: string;
 };
 
 export type ApiError = {
-  error: {
-    code: string;
-    message: string;
-    traceId: string;
-  };
+  status_code: number;
+  status_msg: string;
 };

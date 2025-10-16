@@ -6,14 +6,14 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from flask import Flask, Response, jsonify, make_response, request, g
 from flask_caching import Cache
 from flask_cors import CORS
 
 from .config import settings
-from .models import ErrorResponse, Spec, UploadPayload
+from .models import BusinessErrorCode, Spec, UploadPayload
 from .repository import repository
 from .utils import compute_etag, http_datetime, render_markdown, build_toc
 
@@ -37,14 +37,30 @@ def create_app() -> Flask:
         response.headers["X-Trace-Id"] = g.get("trace_id", "")
         return response
 
-    def response_payload(data: Dict, status: int = 200) -> Response:
-        payload = {"data": data, "traceId": g.trace_id}
+    def response_payload(data: Optional[Dict[str, Any]] = None, status: int = 200) -> Response:
+        payload = {
+            "status_code": 0,
+            "status_msg": "success",
+            "data": data or {},
+        }
         response = make_response(json.dumps(payload, default=str), status)
         response.headers["Content-Type"] = "application/json"
         return response
 
-    def handle_error(code: str, message: str, status: int = 400) -> Response:
-        payload = {"error": ErrorResponse(code=code, message=message, traceId=g.trace_id).dict()}
+    def handle_error(
+        code: BusinessErrorCode,
+        message: Optional[str] = None,
+        status: int = 400,
+        extra_data: Optional[Dict[str, Any]] = None,
+    ) -> Response:
+        error_data: Dict[str, Any] = {"traceId": g.get("trace_id", "")}
+        if extra_data:
+            error_data.update(extra_data)
+        payload = {
+            "status_code": code.value,
+            "status_msg": message or code.default_message,
+            "data": error_data,
+        }
         response = make_response(json.dumps(payload), status)
         response.headers["Content-Type"] = "application/json"
         return response
@@ -54,7 +70,7 @@ def create_app() -> Flask:
         def wrapper(*args, **kwargs):
             token = request.headers.get("X-Admin-Token")
             if token != settings.admin_token:
-                return handle_error("UNAUTHORIZED", "Invalid admin token", 401)
+                return handle_error(BusinessErrorCode.UNAUTHORIZED, "Invalid admin token", 401)
             return func(*args, **kwargs)
 
         return wrapper
@@ -78,7 +94,11 @@ def create_app() -> Flask:
             try:
                 updated_since = datetime.fromisoformat(updated_since_param)
             except ValueError:
-                return handle_error("INVALID_ARG", "updatedSince must be ISO format", 400)
+                return handle_error(
+                    BusinessErrorCode.INVALID_ARG,
+                    "updatedSince must be ISO format",
+                    400,
+                )
         elif filter_key == "today":
             now = datetime.now(timezone.utc)
             updated_since = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -98,10 +118,10 @@ def create_app() -> Flask:
     def get_spec_detail():
         slug = request.args.get("slug")
         if not slug:
-            return handle_error("INVALID_ARG", "slug is required", 400)
+            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         spec = repository.get_spec(slug)
         if not spec:
-            return handle_error("NOT_FOUND", "Spec not found", 404)
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         format_type = request.args.get("format", "html")
         spec_dict = spec.dict(by_alias=True)
         if format_type == "md":
@@ -125,10 +145,10 @@ def create_app() -> Flask:
     def get_spec_raw():
         slug = request.args.get("slug")
         if not slug:
-            return handle_error("INVALID_ARG", "slug is required", 400)
+            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         spec = repository.get_spec(slug)
         if not spec:
-            return handle_error("NOT_FOUND", "Spec not found", 404)
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         etag = compute_etag(spec.contentMd.encode("utf-8"))
         if request.headers.get("If-None-Match") == etag:
             response = make_response("", 304)
@@ -143,10 +163,10 @@ def create_app() -> Flask:
     def download_spec():
         slug = request.args.get("slug")
         if not slug:
-            return handle_error("INVALID_ARG", "slug is required", 400)
+            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         spec = repository.get_spec(slug)
         if not spec:
-            return handle_error("NOT_FOUND", "Spec not found", 404)
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         response = make_response(spec.contentMd)
         response.headers["Content-Type"] = "text/markdown; charset=utf-8"
         response.headers["Content-Disposition"] = f"attachment; filename={slug}.md"
@@ -168,7 +188,7 @@ def create_app() -> Flask:
     def get_category_specs():
         slug = request.args.get("slug")
         if not slug:
-            return handle_error("INVALID_ARG", "slug is required", 400)
+            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         category_specs = repository.list_specs(category=slug)
         return response_payload(json.loads(category_specs.json()))
 
@@ -176,7 +196,7 @@ def create_app() -> Flask:
     def get_tag_specs():
         slug = request.args.get("slug")
         if not slug:
-            return handle_error("INVALID_ARG", "slug is required", 400)
+            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         tag_specs = repository.list_specs(tag=slug)
         return response_payload(json.loads(tag_specs.json()))
 
@@ -187,7 +207,11 @@ def create_app() -> Flask:
         file = request.files.get("file")
         content_md = form.get("content") or (file.read().decode("utf-8") if file else None)
         if not content_md:
-            return handle_error("INVALID_ARG", "Markdown content is required", 400)
+            return handle_error(
+                BusinessErrorCode.INVALID_ARG,
+                "Markdown content is required",
+                400,
+            )
         tags_raw = form.get("tags", "")
         tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
         payload = UploadPayload(
@@ -199,7 +223,7 @@ def create_app() -> Flask:
             version=int(form.get("version", 1)),
         )
         if not payload.slug:
-            return handle_error("INVALID_ARG", "slug is required", 400)
+            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         now = datetime.now(timezone.utc)
         html = render_markdown(content_md)
         toc = build_toc(content_md.splitlines())
@@ -230,12 +254,12 @@ def create_app() -> Flask:
 
     @app.errorhandler(404)
     def not_found(error):  # type: ignore[override]
-        return handle_error("NOT_FOUND", "Route not found", 404)
+        return handle_error(BusinessErrorCode.NOT_FOUND, "Route not found", 404)
 
     @app.errorhandler(Exception)
     def internal_error(error):  # type: ignore[override]
         logging.exception("Unhandled error: %s", error)
-        return handle_error("INTERNAL", "Internal server error", 500)
+        return handle_error(BusinessErrorCode.INTERNAL, "Internal server error", 500)
 
     app.start_time = datetime.now(timezone.utc).timestamp()
 

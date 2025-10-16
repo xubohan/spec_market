@@ -1,9 +1,30 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import IntEnum, unique
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, validator
+
+
+@unique
+class BusinessErrorCode(IntEnum):
+    INVALID_ARG = 1001
+    NOT_FOUND = 1004
+    UNAUTHORIZED = 1003
+    INTERNAL = 1500
+
+    @property
+    def default_message(self) -> str:
+        return _ERROR_MESSAGES[self]
+
+
+_ERROR_MESSAGES = {
+    BusinessErrorCode.INVALID_ARG: "Invalid argument",
+    BusinessErrorCode.NOT_FOUND: "Resource not found",
+    BusinessErrorCode.UNAUTHORIZED: "Unauthorized",
+    BusinessErrorCode.INTERNAL: "Internal server error",
+}
 
 
 class TocItem(BaseModel):
@@ -61,12 +82,6 @@ class Category(BaseModel):
 
 class Tag(Category):
     pass
-
-
-class ErrorResponse(BaseModel):
-    code: str
-    message: str
-    traceId: str
 
 
 class UploadPayload(BaseModel):
