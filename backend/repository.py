@@ -34,8 +34,11 @@ class SpecRepository:
             md = raw["contentMd"]
             toc = build_toc(md.splitlines())
             html = render_markdown(md)
+            normalized = {**raw}
+            normalized.pop("contentHtml", None)
+            normalized.pop("toc", None)
             spec = Spec(
-                **raw,
+                **normalized,
                 contentHtml=html,
                 toc=toc,
             )

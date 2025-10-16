@@ -19,11 +19,19 @@ export const UploadPage = () => {
       setMessage('Please save your Admin-Token before uploading.');
       return;
     }
-    const formData = new FormData(event.currentTarget);
+    setMessage(null);
+    const formElement = event.currentTarget;
+    const fileInput = formElement.elements.namedItem('file') as HTMLInputElement | null;
+    const selectedFile = fileInput?.files?.[0] ?? null;
+    if (selectedFile && !selectedFile.name.toLowerCase().endsWith('.md')) {
+      setMessage('Only .md files are allowed.');
+      return;
+    }
+    const formData = new FormData(formElement);
     try {
       const result = await mutation.mutateAsync({ token, formData });
       setMessage(`Upload successful for ${result.slug}`);
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) {
       if (error instanceof ApiRequestError) {
         setMessage(error.statusMsg);
@@ -84,7 +92,7 @@ export const UploadPage = () => {
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Or upload Markdown file
-          <input type="file" name="file" accept="text/markdown,text/plain,.md" />
+          <input type="file" name="file" accept=".md,text/markdown" />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Version

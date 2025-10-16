@@ -186,16 +186,18 @@ type UploadPayload = {
 
 /** POST /specmarket/v1/uploadSpec */
 export const useUploadSpec = () =>
-  useMutation(async (payload: UploadPayload) => {
-    const response = await fetch(buildUrl('uploadSpec'), {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'X-Admin-Token': payload.token,
-      },
-      body: payload.formData,
-    });
-    return extractApiData<{ id: string; slug: string }>(response);
+  useMutation({
+    mutationFn: async (payload: UploadPayload) => {
+      const response = await fetch(buildUrl('uploadSpec'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-Admin-Token': payload.token,
+        },
+        body: payload.formData,
+      });
+      return extractApiData<{ id: string; slug: string }>(response);
+    },
   });
 
 /** Build app route (not API) for spec detail page */

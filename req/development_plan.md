@@ -126,6 +126,11 @@ web/
 * 键盘导航：`/` 聚焦搜索；`g h` 返回 Home；复制按钮可按回车触发
 * 明暗对比度 > 4.5：1
 
+#### Upload（Admin 工具页，仅内网）
+
+* 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
+* 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
+
 ---
 
 ## 组件清单（关键 Props）
@@ -380,6 +385,12 @@ Spec {
 
 > **写接口（保留不上线）**
 > `POST /api/specs`、`PUT /api/specs/:id`（需要 `X-Admin-Token` + `version` 乐观锁）
+
+#### Upload 接口（POST `/specmarket/v1/uploadSpec`）
+
+* 依赖 MongoDB（`specs` 集合）存储上传文档：字段包括 `slug`（唯一索引）、`title`、`summary`、`category`、`tags`、`contentMd`、`contentHtml`、`toc`、`updatedAt`、`version`。
+* 上传流程：读取表单（文本或文件内容）→ 渲染 Markdown 与 TOC → 使用 `update_one(..., upsert=True)` 保存，若命中重复 `slug` 则覆盖旧记录并刷新 `updatedAt`。
+* 保留磁盘备份（`uploads/{slug}.md`）作为兜底；异常时写入标准错误响应并附带 traceId。
 
 ---
 

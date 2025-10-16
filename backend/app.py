@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import json
 import logging
 import uuid
@@ -11,11 +10,13 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from flask import Flask, Response, jsonify, make_response, request, g
 from flask_caching import Cache
 from flask_cors import CORS
+from pymongo import errors as pymongo_errors
 
 from .config import settings
 from .models import APIResponse, BusinessErrorCode, Spec, UploadPayload
 from .repository import repository
 from .utils import compute_etag, http_datetime, render_markdown, build_toc
+from .mongo import save_spec_document
 
 
 cache = Cache(config={"CACHE_TYPE": settings.cache_backend})
@@ -232,6 +233,18 @@ def create_app() -> Flask:
             updatedAt=now,
             version=payload.version,
         )
+        document = spec.dict(by_alias=True)
+        document["toc"] = [item for item in document.get("toc", []) if item]
+        document["uploadedAt"] = now
+        try:
+            save_spec_document(document)
+        except pymongo_errors.PyMongoError as exc:
+            logging.exception("Failed to persist spec to MongoDB: %s", exc)
+            return handle_error(
+                BusinessErrorCode.INTERNAL,
+                "Failed to persist spec",
+                500,
+            )
         repository.add_spec(spec)
         uploads_dir = repository.data_path.parent / "uploads"
         uploads_dir.mkdir(exist_ok=True)
