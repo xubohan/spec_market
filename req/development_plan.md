@@ -3,6 +3,7 @@
 ## 目标与范围（MVP）
 
 * 左侧主导航仅 **Home / Categories / Tags**，风格贴近 mcp.so。
+* **Upload** 作为临时管理入口，允许内网成员通过 Admin-Token 上传 `spec.md`（支持文本或文件）。
 * 详情页仅 **Overview**（Markdown 渲染），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
@@ -304,6 +305,13 @@ Spec {
 }
 ```
 
+#### 4) Upload（/upload）
+
+* 顶部先输入并保存 **Admin-Token**（LocalStorage 持久化，模拟简单鉴权）。
+* 上传表单包含：标题、Slug、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
+* 成功上传后清空表单并提示 `Upload successful for <slug>`。
+* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<slug>.md` 并存储 HTML、TOC。
+
 ### 3) 获取原文（复制）
 
 `GET /api/specs/:slug/raw`
@@ -318,6 +326,18 @@ Spec {
 * `Content-Disposition: attachment; filename="<slug>.md"`
 
 ### 5) 类目/标签
+
+### 6) 上传接口
+
+`POST /api/specs/upload`（实际部署可通过 Nginx rewrite → `/specmarket/v1/uploadSpec`）
+
+* Header：`X-Admin-Token`
+* Body：`multipart/form-data`
+  * `title`、`slug`、`category`、`summary`、`tags`、`version`
+  * `content`（纯文本 Markdown，可选）
+  * `file`（Markdown 文件，可选；当 `content` 为空时必填）
+* 成功返回 `201 { id, slug }`
+* 失败返回标准错误模型（401/400 等）
 
 `GET /api/categories` → `[{ "name":"backend","slug":"backend","count":23 }]`
 `GET /api/tags` → `[{ "name":"coupon","slug":"coupon","count":12 }]`
