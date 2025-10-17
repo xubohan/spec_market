@@ -60,6 +60,8 @@ class SpecRepository:
         html = render_markdown(md)
         normalized.pop("contentHtml", None)
         normalized.pop("toc", None)
+        if "createdAt" in normalized:
+            normalized["createdAt"] = self._ensure_timezone(normalized["createdAt"])
         if "updatedAt" in normalized:
             normalized["updatedAt"] = self._ensure_timezone(normalized["updatedAt"])
         return Spec(

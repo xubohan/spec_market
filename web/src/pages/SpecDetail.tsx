@@ -29,9 +29,6 @@ export const SpecDetailPage = () => {
               </span>
             ))}
           </div>
-          {/* <p className="mt-3 text-sm text-muted">
-            Updated {new Date(data.updatedAt).toLocaleString()} · v{data.version} · {data.category}
-          </p> */}
         </div>
         <MarkdownView markdown={data.contentMd} html={data.contentHtml} />
       </article>
@@ -47,6 +44,10 @@ export const SpecDetailPage = () => {
           <h3 className="text-sm font-semibold text-muted">Meta</h3>
           <dl className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between">
+              <dt>Author</dt>
+              <dd className="font-medium">{data.author}</dd>
+            </div>
+            <div className="flex justify-between">
               <dt>Category</dt>
               <dd className="font-medium capitalize">{data.category}</dd>
             </div>
@@ -59,8 +60,8 @@ export const SpecDetailPage = () => {
               <dd>{new Date(data.updatedAt).toLocaleString()}</dd>
             </div>
             <div className="flex justify-between">
-              <dt>Version</dt>
-              <dd>{data.version}</dd>
+              <dt>Created</dt>
+              <dd>{new Date(data.createdAt).toLocaleString()}</dd>
             </div>
           </dl>
         </div>

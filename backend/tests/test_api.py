@@ -29,8 +29,9 @@ def test_list_specs_filter_today_handles_naive_documents(client):
             "category": "test",
             "tags": ["tag"],
             "contentMd": "## Overview\nNaive content",
+            "author": "Demo Author",
+            "createdAt": datetime.now(timezone.utc).replace(tzinfo=None),
             "updatedAt": datetime.now(timezone.utc).replace(tzinfo=None),
-            "version": 1,
         }
     )
 
@@ -84,7 +85,7 @@ def test_upload_spec(client):
         "summary": "Uploaded summary",
         "category": "upload",
         "tags": "upload,example",
-        "version": "2",
+        "author": "Release Bot",
     }
     file_content = b"## Overview\nUploaded spec"
     resp = client.post(

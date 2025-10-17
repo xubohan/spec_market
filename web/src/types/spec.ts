@@ -5,8 +5,9 @@ export type SpecSummary = {
   summary: string;
   category: string;
   tags: string[];
+  author: string;
+  createdAt: string;
   updatedAt: string;
-  version: number;
 };
 
 export type TocItem = {

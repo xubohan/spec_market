@@ -5,8 +5,8 @@ Spec Market 是一个用于浏览、搜索与管理产品/技术规格文档的�
 ## 核心特性
 
 * 📚 **文档浏览**：支持首页瀑布流、分类、标签三种入口查看 spec 列表。
-* 🔍 **详情阅读**：React Markdown 渲染、可滚动阅读窗、目录、Meta 信息、复制与下载一应俱全。
-* ⬆️ **上传能力**：`/upload` 页面提供 Admin-Token 保护的上传表单，可直接粘贴 Markdown 或选择 `.md` 文件。
+* 🔍 **详情阅读**：React Markdown 渲染、可滚动阅读窗、目录、包含 Author/Category/Tags/Updated/Created 的 Meta 信息、复制与下载一应俱全。
+* ⬆️ **上传能力**：`/upload` 页面提供 Admin-Token 保护的上传表单，可直接粘贴 Markdown 或选择 `.md` 文件，并需填写上传者 Author 信息。
 * 🧭 **现代交互**：Sidebar 导航、响应式布局、客户端缓存和滚动位置恢复。
 
 ## 项目结构

@@ -117,7 +117,7 @@ web/
 
     * 📋 Copy Markdown（调用 `/api/specs/:slug/raw` → clipboard）
     * ⬇️ Download .md（直链 `/api/specs/:slug/download.md`）
-  * **Meta 卡片**：Category、Tags、Updated、Version
+  * **Meta 卡片**：Author、Category、Tags、Updated、Created
   * **TOC 卡片**：当前文档标题层级目录，点击锚点定位、滚动高亮
 
 **可及性**
@@ -130,11 +130,13 @@ web/
 
 * 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
 * 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
+* 表单需要额外填写 `Author` 字段，便于在详情页 Meta 区域展示上传者。
 
 #### Upload（Admin 工具页，仅内网）
 
 * 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
 * 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
+* 表单需要额外填写 `Author` 字段，便于在详情页 Meta 区域展示上传者。
 
 ---
 

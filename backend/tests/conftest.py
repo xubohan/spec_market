@@ -31,8 +31,9 @@ def override_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Gene
             "category": "test",
             "tags": ["tag"],
             "contentMd": "## Overview\nTest content",
+            "author": "QA Team",
+            "createdAt": "2023-12-25T00:00:00Z",
             "updatedAt": "2024-01-01T00:00:00Z",
-            "version": 1,
         }
     ]
     data_path = tmp_path / "specs.json"

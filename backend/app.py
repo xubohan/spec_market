@@ -209,19 +209,24 @@ def create_app() -> Flask:
             )
         tags_raw = form.get("tags", "")
         tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
+        author = (form.get("author") or "").strip()
         payload = UploadPayload(
             title=form.get("title", "Untitled"),
             slug=form.get("slug", ""),
             category=form.get("category", "uncategorized"),
             summary=form.get("summary", ""),
             tags=tags,
-            version=int(form.get("version", 1)),
+            author=author,
         )
         if not payload.slug:
             return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
+        if not payload.author:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "author is required", 400)
         now = datetime.now(timezone.utc)
         html = render_markdown(content_md)
         toc = build_toc(content_md.splitlines())
+        existing = repository.get_spec(payload.slug)
+        created_at = existing.createdAt if existing else now
         spec = Spec(
             id=f"spec-{uuid.uuid4().hex[:8]}",
             title=payload.title,
@@ -229,15 +234,17 @@ def create_app() -> Flask:
             summary=payload.summary,
             category=payload.category,
             tags=payload.tags,
+            author=payload.author,
+            createdAt=created_at,
             contentMd=content_md,
             contentHtml=html,
             toc=toc,
             updatedAt=now,
-            version=payload.version,
         )
         document = spec.dict(by_alias=True)
         document["toc"] = [item for item in document.get("toc", []) if item]
         document["uploadedAt"] = now
+        document["createdAt"] = spec.createdAt
         try:
             save_spec_document(document)
             repository.refresh_from_document(document)

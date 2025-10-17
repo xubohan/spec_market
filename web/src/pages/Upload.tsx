@@ -81,6 +81,10 @@ export const UploadPage = () => {
             Tags (comma separated)
             <input name="tags" className="rounded-lg border border-muted/30 px-3 py-2" />
           </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Author
+            <input name="author" required className="rounded-lg border border-muted/30 px-3 py-2" />
+          </label>
         </div>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Summary
@@ -93,10 +97,6 @@ export const UploadPage = () => {
         <label className="flex flex-col gap-1 text-sm font-medium">
           Or upload Markdown file
           <input type="file" name="file" accept=".md,text/markdown" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Version
-          <input name="version" type="number" min={1} defaultValue={1} className="w-32 rounded-lg border border-muted/30 px-3 py-2" />
         </label>
         <button
           type="submit"

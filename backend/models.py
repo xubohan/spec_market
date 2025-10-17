@@ -42,11 +42,12 @@ class Spec(BaseModel):
     summary: str
     category: str
     tags: List[str]
+    author: str
+    createdAt: datetime
+    updatedAt: datetime
     contentMd: str = Field(..., alias="contentMd")
     contentHtml: Optional[str] = None
     toc: Optional[List[TocItem]] = None
-    updatedAt: datetime
-    version: int
 
     class Config:
         allow_population_by_field_name = True
@@ -59,8 +60,9 @@ class SpecSummary(BaseModel):
     summary: str
     category: str
     tags: List[str]
+    author: str
+    createdAt: datetime
     updatedAt: datetime
-    version: int
 
 
 class PaginatedSpecs(BaseModel):
@@ -92,7 +94,7 @@ class UploadPayload(BaseModel):
     category: str
     summary: str
     tags: List[str]
-    version: int = 1
+    author: str
 
 
 class APIResponse(BaseModel):
