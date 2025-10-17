@@ -7,6 +7,7 @@
 * 左侧主导航仅 **Home / Categories / Tags**，风格贴近 mcp.so。
 * **Upload** 作为临时管理入口，允许内网成员通过 Admin-Token 上传 `spec.md`（支持文本或文件）。
   * Upload 表单限定仅接受 `.md` 文件：文件选择器设置 `accept=".md,text/markdown"`，提交前追加校验防止非 Markdown 文件被上传。
+* **Edit** 页面允许作者在详情页跳转后，通过 Admin-Token 再次修改 Markdown 与元信息，避免上传后才发现错误。
 * 详情页仅 **Overview**（React Markdown 渲染，滚动容器防止页面被拉长），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
@@ -98,7 +99,7 @@ web/
 * 快捷筛选 Pill：`Today | Latest`（点击切换查询参数）
 * 列表区：`SpecCard` 瀑布式网格（2 列/桌面，1 列/移动）
 
-  * 卡片内容：标题、摘要、标签 chips、更新时间、Short ID（12 位 base62，展示在卡片角落便于复制）
+  * 卡片内容：标题、摘要、标签 chips、更新时间、Short ID（16 位 base62，展示在卡片角落便于复制）
   * 交互：hover 提升阴影、title 下划线
 * 分页：底部 `Pagination`（上一页/下一页 + 页码）
 
@@ -109,7 +110,7 @@ web/
 
 #### 3) Spec 详情（/specs/:shortId）
 
-* 标题区：标题、Short ID（展示为 12 位 base62 短链）、类别/标签 chips、更新时间
+* 标题区：标题、Short ID（展示为 16 位 base62 短链）、类别/标签 chips、更新时间
 * 主栏（左）：`MarkdownView`（优先使用 React Markdown 渲染 `contentMd`，保留 `contentHtml` 兜底，内置可滚动容器）
 * 侧栏（右）：
 
@@ -117,7 +118,8 @@ web/
 
     * 📋 Copy Markdown（调用 `/api/specs/:shortId/raw` → clipboard）
     * ⬇️ Download .md（直链 `/api/specs/:shortId/download.md`）
-  * **Meta 卡片**：Author、Category、Tags、Updated、Created、Short ID（12 位 base62，位于标题下方并在 Meta 区域醒目展示，方便复制分享）
+    * ✏️ Edit Spec（跳转 `/specs/:shortId/edit`，继续使用 Admin-Token 保护）
+  * **Meta 卡片**：Author、Category、Tags、Updated、Created、Short ID（16 位 base62，位于标题下方并在 Meta 区域醒目展示，方便复制分享）
   * **TOC 卡片**：当前文档标题层级目录，点击锚点定位、滚动高亮
 
 **可及性**
@@ -125,6 +127,13 @@ web/
 * 全站语义化（`nav/main/aside`），按钮有 `aria-label`
 * 键盘导航：`/` 聚焦搜索；`g h` 返回 Home；复制按钮可按回车触发
 * 明暗对比度 > 4.5：1
+
+#### 4) Spec 编辑（/specs/:shortId/edit）
+
+* 顶部显示当前 Short ID、跳转回详情页的按钮以及 Admin-Token 输入框（复用 Upload 页逻辑，保存在 localStorage）。
+* 表单字段与上传一致：Title、Category、Tags、Author、Summary、Markdown 文本，初始值来自 `useSpecDetail(shortId, 'md')`。
+* 提交时调用 `PUT /specmarket/v1/updateSpec`，Header 携带 `X-Admin-Token`；成功后提示 "Spec updated successfully." 并刷新缓存。
+* 表单右下角按钮在请求中显示 `Updating...`，失败提示来自后端 `status_msg`。
 
 #### Upload（Admin 工具页，仅内网）
 
@@ -157,7 +166,7 @@ web/
 
 * 通过 TanStack Query 定义 hooks：
 
-  * `useSpecsList(params)`、`useSpec(shortId)`、`useCategories()`、`useTags()`
+  * `useSpecs(params)`、`useSpecDetail(shortId, format)`、`useCategories()`、`useTags()`、`useUploadSpec()`、`useUpdateSpec()`
 * URL 与查询参数同步（支持刷新/分享链接还原当前筛选）
 * 错误边界：统一 `Toast` + 空态组件（可重试）
 
@@ -244,15 +253,13 @@ api/
 ```json
 Spec {
   _id: ObjectId,
-  title: string,
-  shortId: string,          // 唯一，12 位 base62（0-9a-zA-Z），同时作为分享短链与路由参数
+  shortId: string,          // 唯一，16 位 base62（0-9a-zA-Z），同时作为分享短链与路由参数
+  author: string,
   category: string,
-  tags: [string],
-  summary: string,          // 从首段/Front-matter 提取
   contentMd: string,        // 原文
-  contentHtml: string,      // 预渲 + 已 bleach 清洗
-  toc: [ { text, id, level } ],
-  version: number,          // 未来乐观锁
+  summary: string,
+  tags: [string],
+  title: string,
   createdAt: Date,
   updatedAt: Date
 }
@@ -260,7 +267,7 @@ Spec {
 
 **索引**
 
-* `shortId` 唯一（12 位 base62）
+* `shortId` 唯一（16 位 base62）
 * 文本索引：`{ title: "text", summary: "text", contentMd: "text" }`
 * 普通索引：`category`, `tags`, `updatedAt`
 
@@ -272,11 +279,11 @@ Spec {
 
 ## 预渲管道（保存/更新时）
 
-1. `contentMd` → markdown-it-py 渲染 HTML
-2. 生成 headings 锚点（slugify H2/H3…） → `toc[]`
+1. `contentMd` → markdown-it-py 渲染 HTML（仅用于响应缓存，不落库）
+2. 生成 headings 锚点（slugify H2/H3…） → `toc[]`（仅保存在内存模型）
 3. `bleach.clean`（白名单：`p, h1-6, a, code, pre, table, thead, tbody, tr, td, th, ul, ol, li, blockquote, img, strong, em` 等；属性白名单包括 `href, target, rel, src, alt, class, id`）
 4. 提取 `summary`（首段文本 160 字内）
-5. 存库：`contentHtml`, `toc`, `summary`，`updatedAt` 更新时间
+5. 存库：`shortId`、`author`、`category`、`tags`、`summary`、`contentMd`、`createdAt`、`updatedAt`
 
 ---
 
@@ -299,7 +306,7 @@ Spec {
   "status_msg": "OK",
   "data": {
     "items": [
-      { "title":"...", "shortId":"Ab3k9LmNpQr2", "summary":"...", "tags":["..."], "category":"...", "updatedAt":"2025-10-12T08:00:00Z" }
+      { "title":"...", "shortId":"Ab3k9LmNpQr2StUv", "summary":"...", "tags":["..."], "category":"...", "updatedAt":"2025-10-12T08:00:00Z" }
     ],
     "page": 1,
     "pageSize": 20,
@@ -319,7 +326,7 @@ Spec {
   "status_msg": "OK",
   "data": {
     "title":"Amap Maps",
-    "shortId":"Ab3k9LmNpQr2",
+    "shortId":"Ab3k9LmNpQr2StUv",
     "category":"maps",
     "tags":["maps","location-services"],
     "toc":[{"text":"Overview","id":"overview","level":2}],
@@ -334,7 +341,7 @@ Spec {
 #### 4) Upload（/upload）
 
 * 顶部先输入并保存 **Admin-Token**（LocalStorage 持久化，模拟简单鉴权）。
-* 上传表单包含：标题、Short ID（12 位 base62 校验，输入框下方提示 `e.g. Ab3k9LmNpQr2`）、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
+* 上传表单包含：标题、Short ID（16 位 base62 校验，输入框下方提示 `e.g. Ab3k9LmNpQr2StUv`）、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
 * 成功上传后清空表单并提示 `Upload successful for <shortId>`。
 * 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<shortId>.md` 并存储 HTML、TOC。
 * 当前上传端点保持宽松：后端仍接受任意文件类型，依赖前端的 `.md` 限制；若后续需要可在 Flask 层再加 MIME/扩展名校验。
@@ -363,7 +370,7 @@ Spec {
   * `title`、`shortId`、`category`、`summary`、`tags`、`version`
   * `content`（纯文本 Markdown，可选）
   * `file`（Markdown 文件，可选；当 `content` 为空时必填）
-* 成功返回 `201` + `{ "status_code": 0, "status_msg": "Created", "data": { "id": "...", "shortId": "Ab3k9LmNpQr2" } }`
+* 成功返回 `201` + `{ "status_code": 0, "status_msg": "Created", "data": { "id": "...", "shortId": "Ab3k9LmNpQr2StUv" } }`
 * 失败返回标准错误模型（401/400 等），错误响应同样包装在 `{ status_code, status_msg, data }` 中，`data` 至少为空对象或包含字段错误详情。
 
 `GET /api/categories` →
@@ -395,8 +402,8 @@ Spec {
 
 #### Upload 接口（POST `/specmarket/v1/uploadSpec`）
 
-* 依赖 MongoDB（`specs` 集合）存储上传文档：字段包括 `shortId`（唯一索引，12 位 base62）、`title`、`summary`、`category`、`tags`、`contentMd`、`contentHtml`、`toc`、`updatedAt`、`version`。
-* 上传流程：读取表单（文本或文件内容）→ 渲染 Markdown 与 TOC → 使用 `update_one(..., upsert=True)` 保存，若命中重复 `shortId` 则覆盖旧记录并刷新 `updatedAt`。
+* 依赖 MongoDB（`specs` 集合）存储上传文档：字段包括 `shortId`（唯一索引，16 位 base62）、`author`、`category`、`tags`、`summary`、`contentMd`、`title`、`createdAt`、`updatedAt`。
+* 上传流程：读取表单（文本或文件内容）→ 渲染 Markdown 与 TOC（仅用于响应）→ 使用 `update_one(..., upsert=True)` 保存，若命中重复 `shortId` 则覆盖旧记录并刷新 `updatedAt`。
 * 成功写入 Mongo 后刷新内存缓存（`SpecRepository`），不再写入 `backend/uploads/` 或更新 JSON 文件，所有持久化交给 Mongo；异常时写入标准错误响应并附带 traceId。
 * 本地开发：通过 `.env`/环境变量暴露 `MONGODB_URI=mongodb://localhost:27017/specdb`、`MONGODB_DB=specdb`，确保上传接口默认即可连上本地实例。
 
@@ -471,7 +478,7 @@ PORT=5000
 
 * 启动时确保：
 
-  * `shortId` 唯一索引（12 位 base62）
+  * `shortId` 唯一索引（16 位 base62）
   * 文本索引：`title/summary/contentMd`
   * `updatedAt` 排序索引
 

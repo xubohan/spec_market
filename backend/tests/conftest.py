@@ -27,7 +27,7 @@ def override_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Gene
         {
             "id": "spec-1",
             "title": "Test Spec",
-            "shortId": "A1B2C3D4E5F6",
+            "shortId": "A1B2C3D4E5F6G7H8",
             "summary": "Summary",
             "category": "test",
             "tags": ["tag"],

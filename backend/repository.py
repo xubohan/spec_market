@@ -70,9 +70,23 @@ class SpecRepository:
             if not legacy_slug:
                 raise ValueError("Spec document missing shortId")
             normalized["shortId"] = derive_short_id(str(legacy_slug))
-        normalized["shortId"] = str(normalized["shortId"])
+        short_id = str(normalized["shortId"])
+        normalized["shortId"] = short_id
+        normalized["id"] = normalized.get("id") or f"spec-{short_id}"
         normalized.pop("slug", None)
-        md = normalized["contentMd"]
+        if "contentMd" not in normalized or normalized["contentMd"] is None:
+            raise ValueError("Spec document missing contentMd")
+        md = str(normalized["contentMd"])
+        normalized["contentMd"] = md
+        normalized["summary"] = str(normalized.get("summary", ""))
+        normalized["author"] = str(normalized.get("author", ""))
+        tags_value = normalized.get("tags", [])
+        if isinstance(tags_value, (list, tuple, set)):
+            normalized["tags"] = [str(tag) for tag in tags_value]
+        elif tags_value is None:
+            normalized["tags"] = []
+        else:
+            normalized["tags"] = [str(tags_value)]
         toc = build_toc(md.splitlines())
         html = render_markdown(md)
         normalized.pop("contentHtml", None)

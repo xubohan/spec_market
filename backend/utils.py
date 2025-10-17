@@ -12,7 +12,7 @@ from markdown import markdown
 HEADING_PATTERN = re.compile(r"^(#{2,6})\\s+(.*)")
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-SHORT_ID_LENGTH = 12
+SHORT_ID_LENGTH = 16
 SHORT_ID_PATTERN = re.compile(rf"^[{BASE62_ALPHABET}]{{{SHORT_ID_LENGTH}}}$")
 
 

@@ -11,9 +11,17 @@ from flask import Flask, Response, make_response, request, g
 from flask_caching import Cache
 from flask_cors import CORS
 from pymongo import errors as pymongo_errors
+from pydantic import ValidationError
 
 from .config import settings
-from .models import APIResponse, BusinessErrorCode, Spec, UploadPayload
+from .models import (
+    APIResponse,
+    BusinessErrorCode,
+    Spec,
+    UploadPayload,
+    UpdatePayload,
+    spec_to_document,
+)
 from .mongo import save_spec_document
 from .repository import repository
 from .utils import (
@@ -246,8 +254,9 @@ def create_app() -> Flask:
             short_id = payload.shortId or generate_short_id()
             while repository.get_spec(short_id):
                 short_id = generate_short_id()
+        spec_id = existing.id if existing else f"spec-{short_id}"
         spec = Spec(
-            id=f"spec-{uuid.uuid4().hex[:8]}",
+            id=spec_id,
             title=payload.title,
             shortId=short_id,
             summary=payload.summary,
@@ -260,10 +269,7 @@ def create_app() -> Flask:
             toc=toc,
             updatedAt=now,
         )
-        document = spec.dict(by_alias=True)
-        document["toc"] = [item for item in document.get("toc", []) if item]
-        document["uploadedAt"] = now
-        document["createdAt"] = spec.createdAt
+        document = spec_to_document(spec)
         try:
             save_spec_document(document)
             repository.refresh_from_document(document)
@@ -275,6 +281,56 @@ def create_app() -> Flask:
                 500,
             )
         return response_payload({"id": spec.id, "shortId": spec.shortId}, 201)
+
+    @app.route("/specmarket/v1/updateSpec", methods=["PUT"])
+    @require_admin_token
+    def update_spec():
+        payload_json = request.get_json(silent=True)
+        if not payload_json:
+            return handle_error(
+                BusinessErrorCode.INVALID_ARG,
+                "JSON body with spec fields is required",
+                400,
+            )
+        try:
+            payload = UpdatePayload(**payload_json)
+        except ValidationError as exc:
+            message = "; ".join(error["msg"] for error in exc.errors())
+            return handle_error(BusinessErrorCode.INVALID_ARG, message or "Invalid payload", 400)
+        existing = repository.get_spec(payload.shortId)
+        if not existing:
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
+        now = datetime.now(timezone.utc)
+        content_md = payload.contentMd
+        html = render_markdown(content_md)
+        toc = build_toc(content_md.splitlines())
+        spec = Spec(
+            id=existing.id,
+            title=payload.title,
+            shortId=existing.shortId,
+            summary=payload.summary,
+            category=payload.category,
+            tags=payload.tags,
+            author=payload.author,
+            createdAt=existing.createdAt,
+            contentMd=content_md,
+            contentHtml=html,
+            toc=toc,
+            updatedAt=now,
+        )
+        document = spec_to_document(spec)
+        try:
+            save_spec_document(document)
+            repository.refresh_from_document(document)
+        except pymongo_errors.PyMongoError as exc:
+            logging.exception("Failed to persist spec update to MongoDB: %s", exc)
+            return handle_error(
+                BusinessErrorCode.INTERNAL,
+                "Failed to persist spec",
+                500,
+            )
+        cache.clear()
+        return response_payload({"shortId": spec.shortId, "updatedAt": spec.updatedAt}, 200)
 
     @app.route("/healthz")
     def healthz():

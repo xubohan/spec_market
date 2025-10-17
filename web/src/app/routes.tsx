@@ -7,6 +7,7 @@ import { CategoryListPage } from '../pages/CategoryList';
 import { TagsPage } from '../pages/Tags';
 import { TagListPage } from '../pages/TagList';
 import { SpecDetailPage } from '../pages/SpecDetail';
+import { EditSpecPage } from '../pages/EditSpec';
 import { UploadPage } from '../pages/Upload';
 import { AdminTokenProvider } from '../lib/auth';
 import { HeaderBar } from '../components/HeaderBar';
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
       { path: 'tags', element: <TagsPage /> },
       { path: 'tags/:slug', element: <TagListPage /> },
       { path: 'specs/:shortId', element: <SpecDetailPage /> },
+      { path: 'specs/:shortId/edit', element: <EditSpecPage /> },
       { path: 'upload', element: <UploadPage /> }
     ],
   },

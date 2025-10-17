@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from backend.config import settings
 from backend.models import BusinessErrorCode
+from backend import mongo as mongo_module
 
 
 def test_list_specs(client):
@@ -24,7 +25,7 @@ def test_list_specs_filter_today_handles_naive_documents(client):
         {
             "id": "spec-2",
             "title": "Naive datetime spec",
-            "shortId": "B7C8D9E0F1G2",
+            "shortId": "B7C8D9E0F1G2H3I4",
             "summary": "Summary",
             "category": "test",
             "tags": ["tag"],
@@ -40,29 +41,29 @@ def test_list_specs_filter_today_handles_naive_documents(client):
     body = resp.get_json()
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     assert body["data"]["total"] == 1
-    assert body["data"]["items"][0]["shortId"] == "B7C8D9E0F1G2"
-    repo.specs.pop("B7C8D9E0F1G2", None)
+    assert body["data"]["items"][0]["shortId"] == "B7C8D9E0F1G2H3I4"
+    repo.specs.pop("B7C8D9E0F1G2H3I4", None)
 
 
 def test_get_spec_detail(client):
-    resp = client.get("/specmarket/v1/getSpecDetail", query_string={"shortId": "A1B2C3D4E5F6"})
+    resp = client.get("/specmarket/v1/getSpecDetail", query_string={"shortId": "A1B2C3D4E5F6G7H8"})
     assert resp.status_code == 200
     payload = resp.get_json()
     assert payload["status_code"] == BusinessErrorCode.SUCCESS
     assert payload["status_msg"] == "success"
     data = payload["data"]
-    assert data["shortId"] == "A1B2C3D4E5F6"
+    assert data["shortId"] == "A1B2C3D4E5F6G7H8"
     assert "contentHtml" in data
 
 
 def test_get_spec_raw(client):
-    resp = client.get("/specmarket/v1/getSpecRaw", query_string={"shortId": "A1B2C3D4E5F6"})
+    resp = client.get("/specmarket/v1/getSpecRaw", query_string={"shortId": "A1B2C3D4E5F6G7H8"})
     assert resp.status_code == 200
     assert "Test content" in resp.get_data(as_text=True)
 
 
 def test_download_spec(client):
-    resp = client.get("/specmarket/v1/downloadSpec", query_string={"shortId": "A1B2C3D4E5F6"})
+    resp = client.get("/specmarket/v1/downloadSpec", query_string={"shortId": "A1B2C3D4E5F6G7H8"})
     assert resp.status_code == 200
     assert resp.headers["Content-Disposition"].startswith("attachment")
 
@@ -98,9 +99,25 @@ def test_upload_spec(client):
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     assert body["status_msg"] == "success"
     returned_short_id = body["data"]["shortId"]
-    assert len(returned_short_id) == 12
+    assert len(returned_short_id) == 16
     list_resp = client.get("/specmarket/v1/listSpecs", query_string={"_": returned_short_id})
     assert list_resp.get_json()["data"]["total"] == 2
+
+    collection = mongo_module._collection
+    assert isinstance(collection, mongo_module._InMemoryCollection)
+    stored = collection.store[returned_short_id]
+    expected_keys = {
+        "shortId",
+        "title",
+        "summary",
+        "category",
+        "tags",
+        "author",
+        "contentMd",
+        "createdAt",
+        "updatedAt",
+    }
+    assert set(stored.keys()) == expected_keys
 
 
 def test_upload_spec_preserves_short_id_on_update(client):
@@ -153,3 +170,52 @@ def test_error_response_contains_trace_and_code(client):
     assert payload["status_code"] == BusinessErrorCode.INVALID_ARG
     assert payload["status_msg"] == "shortId is required"
     assert payload["data"]["traceId"] == resp.headers["X-Trace-Id"]
+
+
+def test_update_spec_endpoint(client):
+    update_payload = {
+        "shortId": "A1B2C3D4E5F6G7H8",
+        "title": "Test Spec Updated",
+        "summary": "Updated summary",
+        "category": "test",
+        "tags": ["tag", "updated"],
+        "author": "QA Team",
+        "contentMd": "## Overview\nUpdated test content",
+    }
+
+    unauthorized = client.put("/specmarket/v1/updateSpec", json=update_payload)
+    assert unauthorized.status_code == 401
+    assert unauthorized.get_json()["status_code"] == BusinessErrorCode.UNAUTHORIZED
+
+    resp = client.put(
+        "/specmarket/v1/updateSpec",
+        json=update_payload,
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status_code"] == BusinessErrorCode.SUCCESS
+    detail = client.get(
+        "/specmarket/v1/getSpecDetail",
+        query_string={"shortId": update_payload["shortId"], "format": "md"},
+    ).get_json()["data"]
+    assert detail["summary"] == "Updated summary"
+    assert detail["title"] == "Test Spec Updated"
+    assert detail["contentMd"].strip().endswith("Updated test content")
+
+    collection = mongo_module._collection
+    assert isinstance(collection, mongo_module._InMemoryCollection)
+    stored = collection.store[update_payload["shortId"]]
+    assert stored["summary"] == "Updated summary"
+    assert stored["contentMd"].strip().endswith("Updated test content")
+    assert set(stored.keys()) == {
+        "shortId",
+        "title",
+        "summary",
+        "category",
+        "tags",
+        "author",
+        "contentMd",
+        "createdAt",
+        "updatedAt",
+    }

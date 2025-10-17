@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useSpecDetail } from '../lib/api';
 import { MarkdownView } from '../components/MarkdownView';
 import { CopyMarkdownButton } from '../components/CopyMarkdownButton';
@@ -38,6 +38,12 @@ export const SpecDetailPage = () => {
           <div className="mt-4 flex flex-col gap-2">
             <CopyMarkdownButton shortId={data.shortId} />
             <DownloadButton shortId={data.shortId} />
+            <Link
+              to={`/specs/${data.shortId}/edit`}
+              className="rounded-lg border border-primary px-4 py-2 text-center text-sm font-semibold text-primary hover:bg-primary/10"
+            >
+              Edit Spec
+            </Link>
           </div>
         </div>
         <div className="rounded-2xl bg-card p-5 shadow-sm">

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import re
 from pydantic import BaseModel, Field, validator
+from .utils import BASE62_ALPHABET, SHORT_ID_LENGTH
 
 
 @unique
@@ -36,7 +37,9 @@ class TocItem(BaseModel):
     level: int
 
 
-SHORT_ID_REGEX = re.compile(r"^[0-9A-Za-z]{12}$")
+SHORT_ID_REGEX = re.compile(rf"^[{BASE62_ALPHABET}]{{{SHORT_ID_LENGTH}}}$")
+
+SHORT_ID_ERROR = f"shortId must be a {SHORT_ID_LENGTH}-character base62 string"
 
 
 class Spec(BaseModel):
@@ -59,7 +62,7 @@ class Spec(BaseModel):
     @validator("shortId")
     def validate_short_id(cls, value: str) -> str:
         if not SHORT_ID_REGEX.fullmatch(value):
-            raise ValueError("shortId must be a 12-character base62 string")
+            raise ValueError(SHORT_ID_ERROR)
         return value
 
 
@@ -77,7 +80,7 @@ class SpecSummary(BaseModel):
     @validator("shortId")
     def validate_short_id(cls, value: str) -> str:
         if not SHORT_ID_REGEX.fullmatch(value):
-            raise ValueError("shortId must be a 12-character base62 string")
+            raise ValueError(SHORT_ID_ERROR)
         return value
 
 
@@ -117,7 +120,29 @@ class UploadPayload(BaseModel):
         if value is None:
             return value
         if not SHORT_ID_REGEX.fullmatch(value):
-            raise ValueError("shortId must be a 12-character base62 string")
+            raise ValueError(SHORT_ID_ERROR)
+        return value
+
+
+class UpdatePayload(BaseModel):
+    shortId: str
+    title: str
+    summary: str
+    category: str
+    tags: List[str]
+    author: str
+    contentMd: str
+
+    @validator("shortId")
+    def validate_short_id(cls, value: str) -> str:
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError(SHORT_ID_ERROR)
+        return value
+
+    @validator("contentMd")
+    def validate_content(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("contentMd must not be empty")
         return value
 
 
@@ -146,4 +171,20 @@ class APIResponse(BaseModel):
             status_msg=message or code.default_message,
             data=data or {},
         )
+
+
+def spec_to_document(spec: Spec) -> Dict[str, Any]:
+    """Serialize a Spec for Mongo persistence."""
+
+    return {
+        "shortId": spec.shortId,
+        "title": spec.title,
+        "summary": spec.summary,
+        "category": spec.category,
+        "tags": list(spec.tags),
+        "author": spec.author,
+        "contentMd": spec.contentMd,
+        "createdAt": spec.createdAt,
+        "updatedAt": spec.updatedAt,
+    }
 

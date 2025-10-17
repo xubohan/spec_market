@@ -137,11 +137,13 @@ export const useTags = () =>
     queryFn: () => fetchJson<{ items: Tag[] }>('listTags'),
   });
 
+export type SpecDetailFormat = 'html' | 'md' | 'both';
+
 /** Spec detail by shortId */
-export const useSpecDetail = (shortId: string) =>
+export const useSpecDetail = (shortId: string, format: SpecDetailFormat = 'html') =>
   useQuery({
-    queryKey: ['spec', shortId],
-    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { shortId }),
+    queryKey: ['spec', shortId, format],
+    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { shortId, format }),
     enabled: Boolean(shortId),
   });
 
@@ -197,6 +199,42 @@ export const useUploadSpec = () =>
         body: payload.formData,
       });
       return extractApiData<{ id: string; shortId: string }>(response);
+    },
+  });
+
+type UpdateSpecPayload = {
+  token: string;
+  shortId: string;
+  title: string;
+  summary: string;
+  category: string;
+  tags: string[];
+  author: string;
+  contentMd: string;
+};
+
+/** PUT /specmarket/v1/updateSpec */
+export const useUpdateSpec = () =>
+  useMutation({
+    mutationFn: async (payload: UpdateSpecPayload) => {
+      const response = await fetch(buildUrl('updateSpec'), {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Token': payload.token,
+        },
+        body: JSON.stringify({
+          shortId: payload.shortId,
+          title: payload.title,
+          summary: payload.summary,
+          category: payload.category,
+          tags: payload.tags,
+          author: payload.author,
+          contentMd: payload.contentMd,
+        }),
+      });
+      return extractApiData<{ shortId: string; updatedAt: string }>(response);
     },
   });
 
