@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, List
 
 from pymongo import MongoClient, errors
 from pymongo.collection import Collection
@@ -25,6 +25,9 @@ class _InMemoryCollection:
         if not upsert and slug not in self.store:
             return
         self.store[slug] = dict(update["$set"])
+
+    def find(self, filter: Dict[str, Any] | None = None) -> Iterable[Dict[str, Any]]:
+        return [dict(value) for value in self.store.values()]
 
 
 def _init_client() -> None:
@@ -51,3 +54,13 @@ def get_collection() -> Collection | _InMemoryCollection:
 def save_spec_document(document: Dict[str, Any]) -> None:
     collection = get_collection()
     collection.update_one({"slug": document["slug"]}, {"$set": document}, upsert=True)
+
+
+def list_spec_documents() -> List[Dict[str, Any]]:
+    collection = get_collection()
+    try:
+        cursor = collection.find({})  # type: ignore[attr-defined]
+    except AttributeError:
+        logging.warning("Mongo collection does not support find(); returning empty list")
+        return []
+    return [dict(doc) for doc in cursor]

@@ -3,10 +3,14 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
+import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
+
+from pymongo import errors as pymongo_errors
 
 from .models import Category, PaginatedSpecs, Spec, SpecSummary, Tag
+from .mongo import list_spec_documents
 from .utils import build_toc, render_markdown, slugify
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -31,17 +35,37 @@ class SpecRepository:
             raw_specs = json.load(f)
         self.specs: Dict[str, Spec] = {}
         for raw in raw_specs:
-            md = raw["contentMd"]
-            toc = build_toc(md.splitlines())
-            html = render_markdown(md)
-            normalized = {**raw}
-            normalized.pop("contentHtml", None)
-            normalized.pop("toc", None)
-            spec = Spec(
-                **normalized,
-                contentHtml=html,
-                toc=toc,
-            )
+            spec = self._spec_from_raw(raw)
+            self.specs[spec.slug] = spec
+        self._merge_from_mongo()
+
+    def _spec_from_raw(self, raw: Dict[str, Any]) -> Spec:
+        normalized = {**raw}
+        normalized.pop("_id", None)
+        normalized.pop("uploadedAt", None)
+        md = normalized["contentMd"]
+        toc = build_toc(md.splitlines())
+        html = render_markdown(md)
+        normalized.pop("contentHtml", None)
+        normalized.pop("toc", None)
+        return Spec(
+            **normalized,
+            contentHtml=html,
+            toc=toc,
+        )
+
+    def _merge_from_mongo(self) -> None:
+        try:
+            documents = list_spec_documents()
+        except pymongo_errors.PyMongoError as exc:
+            logging.warning("Failed to load specs from MongoDB: %s", exc)
+            return
+        for document in documents:
+            try:
+                spec = self._spec_from_raw(document)
+            except Exception as exc:  # pragma: no cover - defensive
+                logging.warning("Skipping invalid spec document from MongoDB: %s", exc)
+                continue
             self.specs[spec.slug] = spec
 
     def list_specs(
@@ -108,12 +132,15 @@ class SpecRepository:
 
     def add_spec(self, spec: Spec) -> None:
         self.specs[spec.slug] = spec
-        self._persist()
 
     def _persist(self) -> None:
         serialized = [spec.dict(by_alias=True) for spec in self.specs.values()]
         with open(self.data_path, "w", encoding="utf-8") as f:
             json.dump(serialized, f, ensure_ascii=False, indent=2, default=str)
+
+    def refresh_from_document(self, document: Dict[str, Any]) -> None:
+        spec = self._spec_from_raw(document)
+        self.specs[spec.slug] = spec
 
 
 repository = SpecRepository()

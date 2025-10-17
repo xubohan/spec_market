@@ -131,6 +131,11 @@ web/
 * 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
 * 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
 
+#### Upload（Admin 工具页，仅内网）
+
+* 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
+* 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
+
 ---
 
 ## 组件清单（关键 Props）
@@ -390,7 +395,8 @@ Spec {
 
 * 依赖 MongoDB（`specs` 集合）存储上传文档：字段包括 `slug`（唯一索引）、`title`、`summary`、`category`、`tags`、`contentMd`、`contentHtml`、`toc`、`updatedAt`、`version`。
 * 上传流程：读取表单（文本或文件内容）→ 渲染 Markdown 与 TOC → 使用 `update_one(..., upsert=True)` 保存，若命中重复 `slug` 则覆盖旧记录并刷新 `updatedAt`。
-* 保留磁盘备份（`uploads/{slug}.md`）作为兜底；异常时写入标准错误响应并附带 traceId。
+* 成功写入 Mongo 后刷新内存缓存（`SpecRepository`），不再写入 `backend/uploads/` 或更新 JSON 文件，所有持久化交给 Mongo；异常时写入标准错误响应并附带 traceId。
+* 本地开发：通过 `.env`/环境变量暴露 `MONGODB_URI=mongodb://localhost:27017/specdb`、`MONGODB_DB=specdb`，确保上传接口默认即可连上本地实例。
 
 ---
 

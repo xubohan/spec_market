@@ -27,11 +27,32 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env  # 可选：快速填充本地环境变量
 export ADMIN_TOKEN="your-admin-token"
-flask --app app run --port 5000
+flask --app app run --port 8000
 ```
 
 API 默认挂在 `/specmarket/v1`，上传接口为 `POST /specmarket/v1/uploadSpec`，需要在 Header 中附带 `X-Admin-Token`。
+
+#### 本地 MongoDB 配置
+
+后端会优先连接 `MONGODB_URI` 指定的实例，默认指向 `mongodb://localhost:27017/specdb`。可以使用 Docker 在本地快速启动测试库：
+
+```bash
+docker run --name spec-market-mongo \
+  -e MONGO_INITDB_DATABASE=specdb \
+  -p 27017:27017 \
+  -d mongo:6
+```
+
+随后在 `backend/.env` 中确认：
+
+```bash
+MONGODB_URI=mongodb://localhost:27017/specdb
+MONGODB_DB=specdb
+```
+
+启动 Flask 后端时会自动探活 Mongo。如果 Mongo 不可达则回退到内存集合（仅测试使用，不会写入磁盘）。
 
 ### 前端（Vite）
 

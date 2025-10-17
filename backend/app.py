@@ -11,11 +11,13 @@ from flask import Flask, Response, jsonify, make_response, request, g
 from flask_caching import Cache
 from flask_cors import CORS
 from pymongo import errors as pymongo_errors
+from pymongo import errors as pymongo_errors
 
 from .config import settings
 from .models import APIResponse, BusinessErrorCode, Spec, UploadPayload
 from .repository import repository
 from .utils import compute_etag, http_datetime, render_markdown, build_toc
+from .mongo import save_spec_document
 from .mongo import save_spec_document
 
 
@@ -238,6 +240,7 @@ def create_app() -> Flask:
         document["uploadedAt"] = now
         try:
             save_spec_document(document)
+            repository.refresh_from_document(document)
         except pymongo_errors.PyMongoError as exc:
             logging.exception("Failed to persist spec to MongoDB: %s", exc)
             return handle_error(
@@ -245,11 +248,6 @@ def create_app() -> Flask:
                 "Failed to persist spec",
                 500,
             )
-        repository.add_spec(spec)
-        uploads_dir = repository.data_path.parent / "uploads"
-        uploads_dir.mkdir(exist_ok=True)
-        with open(uploads_dir / f"{spec.slug}.md", "w", encoding="utf-8") as f:
-            f.write(content_md)
         return response_payload({"id": spec.id, "slug": spec.slug}, 201)
 
     @app.route("/healthz")
