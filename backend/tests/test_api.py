@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from datetime import datetime, timezone
 
 from backend.config import settings
 from backend.models import BusinessErrorCode
@@ -13,6 +14,33 @@ def test_list_specs(client):
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     assert body["status_msg"] == "success"
     assert body["data"]["total"] == 1
+
+
+def test_list_specs_filter_today_handles_naive_documents(client):
+    from backend import repository as repository_module
+
+    repo = repository_module.repository
+    repo.refresh_from_document(
+        {
+            "id": "spec-2",
+            "title": "Naive datetime spec",
+            "slug": "naive-spec",
+            "summary": "Summary",
+            "category": "test",
+            "tags": ["tag"],
+            "contentMd": "## Overview\nNaive content",
+            "updatedAt": datetime.now(timezone.utc).replace(tzinfo=None),
+            "version": 1,
+        }
+    )
+
+    resp = client.get("/specmarket/v1/listSpecs", query_string={"filter": "today"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status_code"] == BusinessErrorCode.SUCCESS
+    assert body["data"]["total"] == 1
+    assert body["data"]["items"][0]["slug"] == "naive-spec"
+    repo.specs.pop("naive-spec", None)
 
 
 def test_get_spec_detail(client):

@@ -33,7 +33,7 @@ export const SpecDetailPage = () => {
             Updated {new Date(data.updatedAt).toLocaleString()} · v{data.version} · {data.category}
           </p>
         </div>
-        <MarkdownView html={data.contentHtml} />
+        <MarkdownView markdown={data.contentMd} html={data.contentHtml} />
       </article>
       <aside className="space-y-6">
         <div className="rounded-2xl bg-card p-5 shadow-sm">

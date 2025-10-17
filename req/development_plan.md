@@ -7,7 +7,7 @@
 * 左侧主导航仅 **Home / Categories / Tags**，风格贴近 mcp.so。
 * **Upload** 作为临时管理入口，允许内网成员通过 Admin-Token 上传 `spec.md`（支持文本或文件）。
   * Upload 表单限定仅接受 `.md` 文件：文件选择器设置 `accept=".md,text/markdown"`，提交前追加校验防止非 Markdown 文件被上传。
-* 详情页仅 **Overview**（Markdown 渲染），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
+* 详情页仅 **Overview**（React Markdown 渲染，滚动容器防止页面被拉长），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
 * 前端从所有 API 统一接收 `{ status_code, status_msg, data }` 包装结构；仅当 `status_code === 0` 视为成功。
@@ -110,7 +110,7 @@ web/
 #### 3) Spec 详情（/specs/:slug）
 
 * 标题区：标题、类别/标签 chips、更新时间
-* 主栏（左）：`MarkdownView`（服务端预渲 `contentHtml`，客户端二次 sanitize）
+* 主栏（左）：`MarkdownView`（优先使用 React Markdown 渲染 `contentMd`，保留 `contentHtml` 兜底，内置可滚动容器）
 * 侧栏（右）：
 
   * **Actions 卡片**：
@@ -143,7 +143,7 @@ web/
 * `SidebarNav({active: 'home'|'categories'|'tags'})`
 * `SearchBar({defaultQuery, onSearch})`
 * `SpecCard({title, slug, summary, tags, updatedAt})`
-* `MarkdownView({html: string})`（兜底支持 md 渲染）
+* `MarkdownView({markdown?: string, html?: string})`
 * `Toc({items: TocItem[], onJump})`
 * `CopyMarkdownButton({slug})`
 * `DownloadButton({slug})`

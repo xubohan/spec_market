@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
@@ -39,6 +39,18 @@ class SpecRepository:
             self.specs[spec.slug] = spec
         self._merge_from_mongo()
 
+    def _ensure_timezone(self, value: Any) -> datetime:
+        if isinstance(value, str):
+            normalized = value.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(normalized)
+        elif isinstance(value, datetime):
+            dt = value
+        else:
+            raise TypeError(f"Unsupported datetime value: {value!r}")
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
     def _spec_from_raw(self, raw: Dict[str, Any]) -> Spec:
         normalized = {**raw}
         normalized.pop("_id", None)
@@ -48,6 +60,8 @@ class SpecRepository:
         html = render_markdown(md)
         normalized.pop("contentHtml", None)
         normalized.pop("toc", None)
+        if "updatedAt" in normalized:
+            normalized["updatedAt"] = self._ensure_timezone(normalized["updatedAt"])
         return Spec(
             **normalized,
             contentHtml=html,
