@@ -24,7 +24,7 @@ def test_list_specs_filter_today_handles_naive_documents(client):
         {
             "id": "spec-2",
             "title": "Naive datetime spec",
-            "slug": "naive-spec",
+            "shortId": "B7C8D9E0F1G2",
             "summary": "Summary",
             "category": "test",
             "tags": ["tag"],
@@ -40,29 +40,29 @@ def test_list_specs_filter_today_handles_naive_documents(client):
     body = resp.get_json()
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     assert body["data"]["total"] == 1
-    assert body["data"]["items"][0]["slug"] == "naive-spec"
-    repo.specs.pop("naive-spec", None)
+    assert body["data"]["items"][0]["shortId"] == "B7C8D9E0F1G2"
+    repo.specs.pop("B7C8D9E0F1G2", None)
 
 
 def test_get_spec_detail(client):
-    resp = client.get("/specmarket/v1/getSpecDetail", query_string={"slug": "test-spec"})
+    resp = client.get("/specmarket/v1/getSpecDetail", query_string={"shortId": "A1B2C3D4E5F6"})
     assert resp.status_code == 200
     payload = resp.get_json()
     assert payload["status_code"] == BusinessErrorCode.SUCCESS
     assert payload["status_msg"] == "success"
     data = payload["data"]
-    assert data["slug"] == "test-spec"
+    assert data["shortId"] == "A1B2C3D4E5F6"
     assert "contentHtml" in data
 
 
 def test_get_spec_raw(client):
-    resp = client.get("/specmarket/v1/getSpecRaw", query_string={"slug": "test-spec"})
+    resp = client.get("/specmarket/v1/getSpecRaw", query_string={"shortId": "A1B2C3D4E5F6"})
     assert resp.status_code == 200
     assert "Test content" in resp.get_data(as_text=True)
 
 
 def test_download_spec(client):
-    resp = client.get("/specmarket/v1/downloadSpec", query_string={"slug": "test-spec"})
+    resp = client.get("/specmarket/v1/downloadSpec", query_string={"shortId": "A1B2C3D4E5F6"})
     assert resp.status_code == 200
     assert resp.headers["Content-Disposition"].startswith("attachment")
 
@@ -81,7 +81,6 @@ def test_list_categories_and_tags(client):
 def test_upload_spec(client):
     data = {
         "title": "Uploaded",
-        "slug": "uploaded-spec",
         "summary": "Uploaded summary",
         "category": "upload",
         "tags": "upload,example",
@@ -98,8 +97,53 @@ def test_upload_spec(client):
     body = resp.get_json()
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     assert body["status_msg"] == "success"
-    list_resp = client.get("/specmarket/v1/listSpecs")
+    returned_short_id = body["data"]["shortId"]
+    assert len(returned_short_id) == 12
+    list_resp = client.get("/specmarket/v1/listSpecs", query_string={"_": returned_short_id})
     assert list_resp.get_json()["data"]["total"] == 2
+
+
+def test_upload_spec_preserves_short_id_on_update(client):
+    data = {
+        "title": "Uploaded",
+        "summary": "Uploaded summary",
+        "category": "upload",
+        "tags": "upload,example",
+        "author": "Release Bot",
+    }
+    file_content = b"## Overview\nUploaded spec"
+    create_resp = client.post(
+        "/specmarket/v1/uploadSpec",
+        data={**data, "file": (io.BytesIO(file_content), "upload.md")},
+        headers={"X-Admin-Token": settings.admin_token},
+        content_type="multipart/form-data",
+    )
+    assert create_resp.status_code == 201
+    short_id = create_resp.get_json()["data"]["shortId"]
+
+    updated_content = b"## Overview\nUpdated spec"
+    update_resp = client.post(
+        "/specmarket/v1/uploadSpec",
+        data={
+            **data,
+            "shortId": short_id,
+            "summary": "Updated summary",
+            "file": (io.BytesIO(updated_content), "upload.md"),
+        },
+        headers={"X-Admin-Token": settings.admin_token},
+        content_type="multipart/form-data",
+    )
+    assert update_resp.status_code == 201
+    detail_resp = client.get("/specmarket/v1/getSpecDetail", query_string={"shortId": short_id})
+    detail_data = detail_resp.get_json()["data"]
+    assert detail_data["summary"] == "Updated summary"
+    list_resp = client.get(
+        "/specmarket/v1/listSpecs",
+        query_string={"_": f"update-{short_id}"},
+    )
+    body = list_resp.get_json()
+    assert body["data"]["total"] == 2
+    assert sum(1 for item in body["data"]["items"] if item["shortId"] == short_id) == 1
 
 
 def test_error_response_contains_trace_and_code(client):
@@ -107,5 +151,5 @@ def test_error_response_contains_trace_and_code(client):
     assert resp.status_code == 400
     payload = resp.get_json()
     assert payload["status_code"] == BusinessErrorCode.INVALID_ARG
-    assert payload["status_msg"] == "slug is required"
+    assert payload["status_msg"] == "shortId is required"
     assert payload["data"]["traceId"] == resp.headers["X-Trace-Id"]

@@ -1,7 +1,7 @@
 export type SpecSummary = {
   id: string;
   title: string;
-  slug: string;
+  shortId: string;
   summary: string;
   category: string;
   tags: string[];

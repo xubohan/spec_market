@@ -6,8 +6,8 @@ import { DownloadButton } from '../components/DownloadButton';
 import { Toc } from '../components/Toc';
 
 export const SpecDetailPage = () => {
-  const { slug = '' } = useParams();
-  const { data, isLoading } = useSpecDetail(slug);
+  const { shortId = '' } = useParams();
+  const { data, isLoading } = useSpecDetail(shortId);
 
   if (isLoading) {
     return <p className="text-muted">Loading...</p>;
@@ -36,8 +36,8 @@ export const SpecDetailPage = () => {
         <div className="rounded-2xl bg-card p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-muted">Actions</h3>
           <div className="mt-4 flex flex-col gap-2">
-            <CopyMarkdownButton slug={data.slug} />
-            <DownloadButton slug={data.slug} />
+            <CopyMarkdownButton shortId={data.shortId} />
+            <DownloadButton shortId={data.shortId} />
           </div>
         </div>
         <div className="rounded-2xl bg-card p-5 shadow-sm">
@@ -46,6 +46,10 @@ export const SpecDetailPage = () => {
             <div className="flex justify-between">
               <dt>Author</dt>
               <dd className="font-medium">{data.author}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>Short ID</dt>
+              <dd className="font-mono text-xs">{data.shortId}</dd>
             </div>
             <div className="flex justify-between">
               <dt>Category</dt>

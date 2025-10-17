@@ -137,12 +137,12 @@ export const useTags = () =>
     queryFn: () => fetchJson<{ items: Tag[] }>('listTags'),
   });
 
-/** Spec detail by slug */
-export const useSpecDetail = (slug: string) =>
+/** Spec detail by shortId */
+export const useSpecDetail = (shortId: string) =>
   useQuery({
-    queryKey: ['spec', slug],
-    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { slug }),
-    enabled: Boolean(slug),
+    queryKey: ['spec', shortId],
+    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { shortId }),
+    enabled: Boolean(shortId),
   });
 
 /** Specs by category */
@@ -164,13 +164,13 @@ export const useSpecsByTag = (slug: string) =>
 /** -------------------- Utilities -------------------- */
 
 /** Download markdown as a file (opens new tab) */
-export const downloadMarkdown = (slug: string) => {
-  window.open(buildUrl('downloadSpec', { slug }), '_blank');
+export const downloadMarkdown = (shortId: string) => {
+  window.open(buildUrl('downloadSpec', { shortId }), '_blank');
 };
 
 /** Copy raw markdown to clipboard */
-export const copyMarkdown = async (slug: string) => {
-  const response = await fetch(buildUrl('getSpecRaw', { slug }), { credentials: 'include' });
+export const copyMarkdown = async (shortId: string) => {
+  const response = await fetch(buildUrl('getSpecRaw', { shortId }), { credentials: 'include' });
   if (!response.ok) throw new Error('Failed to fetch markdown');
   const text = await response.text();
   await navigator.clipboard.writeText(text);
@@ -196,11 +196,11 @@ export const useUploadSpec = () =>
         },
         body: payload.formData,
       });
-      return extractApiData<{ id: string; slug: string }>(response);
+      return extractApiData<{ id: string; shortId: string }>(response);
     },
   });
 
 /** Build app route (not API) for spec detail page */
-export const buildSpecLink = (slug: string) => `/specs/${slug}`;
+export const buildSpecLink = (shortId: string) => `/specs/${shortId}`;
 
 export type { Category, Tag, PaginatedSpecs, SpecDetail };

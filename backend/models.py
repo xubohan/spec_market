@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import IntEnum, unique
 from typing import Any, Dict, List, Optional
 
+import re
 from pydantic import BaseModel, Field, validator
 
 
@@ -35,10 +36,13 @@ class TocItem(BaseModel):
     level: int
 
 
+SHORT_ID_REGEX = re.compile(r"^[0-9A-Za-z]{12}$")
+
+
 class Spec(BaseModel):
     id: str
     title: str
-    slug: str
+    shortId: str
     summary: str
     category: str
     tags: List[str]
@@ -52,17 +56,29 @@ class Spec(BaseModel):
     class Config:
         allow_population_by_field_name = True
 
+    @validator("shortId")
+    def validate_short_id(cls, value: str) -> str:
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError("shortId must be a 12-character base62 string")
+        return value
+
 
 class SpecSummary(BaseModel):
     id: str
     title: str
-    slug: str
+    shortId: str
     summary: str
     category: str
     tags: List[str]
     author: str
     createdAt: datetime
     updatedAt: datetime
+
+    @validator("shortId")
+    def validate_short_id(cls, value: str) -> str:
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError("shortId must be a 12-character base62 string")
+        return value
 
 
 class PaginatedSpecs(BaseModel):
@@ -90,11 +106,19 @@ class Tag(Category):
 
 class UploadPayload(BaseModel):
     title: str
-    slug: str
     category: str
     summary: str
     tags: List[str]
     author: str
+    shortId: Optional[str] = None
+
+    @validator("shortId")
+    def validate_optional_short_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError("shortId must be a 12-character base62 string")
+        return value
 
 
 class APIResponse(BaseModel):

@@ -17,14 +17,14 @@ class _InMemoryCollection:
         self.store: Dict[str, Dict[str, Any]] = {}
 
     def update_one(self, filter: Dict[str, Any], update: Dict[str, Any], upsert: bool = False) -> None:
-        slug = filter.get("slug")
-        if slug is None:
-            raise ValueError("slug filter is required for in-memory fallback")
+        short_id = filter.get("shortId")
+        if short_id is None:
+            raise ValueError("shortId filter is required for in-memory fallback")
         if "$set" not in update:
             raise ValueError("$set update is required for in-memory fallback")
-        if not upsert and slug not in self.store:
+        if not upsert and short_id not in self.store:
             return
-        self.store[slug] = dict(update["$set"])
+        self.store[short_id] = dict(update["$set"])
 
     def find(self, filter: Dict[str, Any] | None = None) -> Iterable[Dict[str, Any]]:
         return [dict(value) for value in self.store.values()]
@@ -53,7 +53,7 @@ def get_collection() -> Collection | _InMemoryCollection:
 
 def save_spec_document(document: Dict[str, Any]) -> None:
     collection = get_collection()
-    collection.update_one({"slug": document["slug"]}, {"$set": document}, upsert=True)
+    collection.update_one({"shortId": document["shortId"]}, {"$set": document}, upsert=True)
 
 
 def list_spec_documents() -> List[Dict[str, Any]]:

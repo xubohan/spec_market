@@ -7,7 +7,7 @@ export const SpecCard = ({ spec }: { spec: SpecSummary }) => {
   return (
     <div className="flex flex-col justify-between rounded-2xl bg-card p-5 shadow-sm transition hover:shadow-md">
       <div className="space-y-3">
-        <Link to={buildSpecLink(spec.slug)} className="text-xl font-semibold hover:underline">
+        <Link to={buildSpecLink(spec.shortId)} className="text-xl font-semibold hover:underline">
           {spec.title}
         </Link>
         <p className="text-sm text-muted">{spec.summary}</p>

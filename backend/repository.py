@@ -3,15 +3,22 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
-import logging
 from pathlib import Path
 from typing import Any, Dict, List
+
+import logging
 
 from pymongo import errors as pymongo_errors
 
 from .models import Category, PaginatedSpecs, Spec, SpecSummary, Tag
 from .mongo import list_spec_documents
-from .utils import build_toc, render_markdown, slugify
+from .utils import (
+    build_toc,
+    derive_short_id,
+    is_valid_short_id,
+    render_markdown,
+    slugify,
+)
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -37,7 +44,7 @@ class SpecRepository:
                 raw_specs = json.load(f)
             for raw in raw_specs:
                 spec = self._spec_from_raw(raw)
-                self.specs[spec.slug] = spec
+                self.specs[spec.shortId] = spec
         else:
             logging.info("Spec data file %s not found; loading from MongoDB only", self.data_path)
         self._merge_from_mongo()
@@ -58,6 +65,13 @@ class SpecRepository:
         normalized = {**raw}
         normalized.pop("_id", None)
         normalized.pop("uploadedAt", None)
+        if "shortId" not in normalized or not is_valid_short_id(str(normalized["shortId"])):
+            legacy_slug = normalized.get("slug") or normalized.get("shortId")
+            if not legacy_slug:
+                raise ValueError("Spec document missing shortId")
+            normalized["shortId"] = derive_short_id(str(legacy_slug))
+        normalized["shortId"] = str(normalized["shortId"])
+        normalized.pop("slug", None)
         md = normalized["contentMd"]
         toc = build_toc(md.splitlines())
         html = render_markdown(md)
@@ -85,7 +99,7 @@ class SpecRepository:
             except Exception as exc:  # pragma: no cover - defensive
                 logging.warning("Skipping invalid spec document from MongoDB: %s", exc)
                 continue
-            self.specs[spec.slug] = spec
+            self.specs[spec.shortId] = spec
 
     def list_specs(
         self,
@@ -127,8 +141,8 @@ class SpecRepository:
             items=summaries,
         )
 
-    def get_spec(self, slug: str) -> Spec | None:
-        return self.specs.get(slug)
+    def get_spec(self, short_id: str) -> Spec | None:
+        return self.specs.get(short_id)
 
     def list_categories(self) -> List[Category]:
         counts: Dict[str, int] = {}
@@ -150,7 +164,7 @@ class SpecRepository:
         return tags
 
     def add_spec(self, spec: Spec) -> None:
-        self.specs[spec.slug] = spec
+        self.specs[spec.shortId] = spec
 
     def _persist(self) -> None:
         serialized = [spec.dict(by_alias=True) for spec in self.specs.values()]
@@ -159,7 +173,7 @@ class SpecRepository:
 
     def refresh_from_document(self, document: Dict[str, Any]) -> None:
         spec = self._spec_from_raw(document)
-        self.specs[spec.slug] = spec
+        self.specs[spec.shortId] = spec
 
 
 repository = SpecRepository()

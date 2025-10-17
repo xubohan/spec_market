@@ -54,7 +54,7 @@ export const router = createBrowserRouter([
       { path: 'categories/:slug', element: <CategoryListPage /> },
       { path: 'tags', element: <TagsPage /> },
       { path: 'tags/:slug', element: <TagListPage /> },
-      { path: 'specs/:slug', element: <SpecDetailPage /> },
+      { path: 'specs/:shortId', element: <SpecDetailPage /> },
       { path: 'upload', element: <UploadPage /> }
     ],
   },

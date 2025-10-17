@@ -3,6 +3,6 @@ import { buildSpecLink } from './api';
 
 describe('buildSpecLink', () => {
   it('returns a spec path', () => {
-    expect(buildSpecLink('demo-slug')).toBe('/specs/demo-slug');
+    expect(buildSpecLink('abc123')).toBe('/specs/abc123');
   });
 });

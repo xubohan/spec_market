@@ -2,11 +2,11 @@ import { copyMarkdown } from '../lib/api';
 import { useState } from 'react';
 import { ClipboardCheck, ClipboardCopy } from 'lucide-react';
 
-export const CopyMarkdownButton = ({ slug }: { slug: string }) => {
+export const CopyMarkdownButton = ({ shortId }: { shortId: string }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await copyMarkdown(slug);
+    await copyMarkdown(shortId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

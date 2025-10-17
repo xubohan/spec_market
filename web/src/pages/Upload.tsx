@@ -6,20 +6,24 @@ export const UploadPage = () => {
   const { token, setToken } = useAdminToken();
   const [localToken, setLocalToken] = useState(token ?? '');
   const [message, setMessage] = useState<string | null>(null);
+  const [uploadedShortId, setUploadedShortId] = useState<string | null>(null);
   const mutation = useUploadSpec();
 
   const handleSaveToken = () => {
     setToken(localToken || null);
     setMessage('Admin token saved.');
+    setUploadedShortId(null);
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!token) {
       setMessage('Please save your Admin-Token before uploading.');
+      setUploadedShortId(null);
       return;
     }
     setMessage(null);
+    setUploadedShortId(null);
     const formElement = event.currentTarget;
     const fileInput = formElement.elements.namedItem('file') as HTMLInputElement | null;
     const selectedFile = fileInput?.files?.[0] ?? null;
@@ -30,9 +34,11 @@ export const UploadPage = () => {
     const formData = new FormData(formElement);
     try {
       const result = await mutation.mutateAsync({ token, formData });
-      setMessage(`Upload successful for ${result.slug}`);
+      setMessage('Upload successful.');
+      setUploadedShortId(result.shortId);
       formElement.reset();
     } catch (error) {
+      setUploadedShortId(null);
       if (error instanceof ApiRequestError) {
         setMessage(error.statusMsg);
       } else {
@@ -70,10 +76,6 @@ export const UploadPage = () => {
             <input name="title" required className="rounded-lg border border-muted/30 px-3 py-2" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Slug
-            <input name="slug" required className="rounded-lg border border-muted/30 px-3 py-2" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium">
             Category
             <input name="category" required className="rounded-lg border border-muted/30 px-3 py-2" />
           </label>
@@ -106,6 +108,22 @@ export const UploadPage = () => {
           {mutation.isPending ? 'Uploading...' : 'Upload Spec'}
         </button>
         {message && <p className="text-sm text-muted">{message}</p>}
+        {uploadedShortId && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
+            <span>Short ID:</span>
+            <code className="rounded bg-muted/20 px-2 py-1 font-mono text-xs text-text">{uploadedShortId}</code>
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(uploadedShortId);
+                setMessage('Short ID copied to clipboard.');
+              }}
+              className="rounded bg-muted/20 px-2 py-1 text-xs font-medium text-text hover:bg-muted/30"
+            >
+              Copy Short ID
+            </button>
+          </div>
+        )}
       </form>
     </section>
   );

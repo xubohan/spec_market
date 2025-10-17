@@ -5,20 +5,25 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 
-from flask import Flask, Response, jsonify, make_response, request, g
+from flask import Flask, Response, make_response, request, g
 from flask_caching import Cache
 from flask_cors import CORS
-from pymongo import errors as pymongo_errors
 from pymongo import errors as pymongo_errors
 
 from .config import settings
 from .models import APIResponse, BusinessErrorCode, Spec, UploadPayload
+from .mongo import save_spec_document
 from .repository import repository
-from .utils import compute_etag, http_datetime, render_markdown, build_toc
-from .mongo import save_spec_document
-from .mongo import save_spec_document
+from .utils import (
+    build_toc,
+    compute_etag,
+    derive_short_id,
+    generate_short_id,
+    http_datetime,
+    render_markdown,
+)
 
 
 cache = Cache(config={"CACHE_TYPE": settings.cache_backend})
@@ -111,10 +116,10 @@ def create_app() -> Flask:
     @app.route("/specmarket/v1/getSpecDetail")
     @cache.cached(timeout=60, key_prefix=cache_key)
     def get_spec_detail():
-        slug = request.args.get("slug")
-        if not slug:
-            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
-        spec = repository.get_spec(slug)
+        short_id = request.args.get("shortId")
+        if not short_id:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "shortId is required", 400)
+        spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         format_type = request.args.get("format", "html")
@@ -138,10 +143,10 @@ def create_app() -> Flask:
     @app.route("/specmarket/v1/getSpecRaw")
     @cache.cached(timeout=60, key_prefix=cache_key)
     def get_spec_raw():
-        slug = request.args.get("slug")
-        if not slug:
-            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
-        spec = repository.get_spec(slug)
+        short_id = request.args.get("shortId")
+        if not short_id:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "shortId is required", 400)
+        spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         etag = compute_etag(spec.contentMd.encode("utf-8"))
@@ -156,15 +161,15 @@ def create_app() -> Flask:
 
     @app.route("/specmarket/v1/downloadSpec")
     def download_spec():
-        slug = request.args.get("slug")
-        if not slug:
-            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
-        spec = repository.get_spec(slug)
+        short_id = request.args.get("shortId")
+        if not short_id:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "shortId is required", 400)
+        spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         response = make_response(spec.contentMd)
         response.headers["Content-Type"] = "text/markdown; charset=utf-8"
-        response.headers["Content-Disposition"] = f"attachment; filename={slug}.md"
+        response.headers["Content-Disposition"] = f"attachment; filename={short_id}.md"
         return response
 
     @app.route("/specmarket/v1/listCategories")
@@ -210,27 +215,41 @@ def create_app() -> Flask:
         tags_raw = form.get("tags", "")
         tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
         author = (form.get("author") or "").strip()
+        legacy_slug = (form.get("slug") or "").strip() or None
+        short_id_candidate = (form.get("shortId") or "").strip() or None
+        existing = None
+        if short_id_candidate:
+            existing = repository.get_spec(short_id_candidate)
+        elif legacy_slug:
+            derived_short_id = derive_short_id(legacy_slug)
+            existing = repository.get_spec(derived_short_id)
+            if existing:
+                short_id_candidate = existing.shortId
         payload = UploadPayload(
             title=form.get("title", "Untitled"),
-            slug=form.get("slug", ""),
             category=form.get("category", "uncategorized"),
             summary=form.get("summary", ""),
             tags=tags,
             author=author,
+            shortId=short_id_candidate,
         )
-        if not payload.slug:
-            return handle_error(BusinessErrorCode.INVALID_ARG, "slug is required", 400)
         if not payload.author:
             return handle_error(BusinessErrorCode.INVALID_ARG, "author is required", 400)
         now = datetime.now(timezone.utc)
         html = render_markdown(content_md)
         toc = build_toc(content_md.splitlines())
-        existing = repository.get_spec(payload.slug)
+        existing = existing or (repository.get_spec(payload.shortId) if payload.shortId else None)
         created_at = existing.createdAt if existing else now
+        if existing:
+            short_id = existing.shortId
+        else:
+            short_id = payload.shortId or generate_short_id()
+            while repository.get_spec(short_id):
+                short_id = generate_short_id()
         spec = Spec(
             id=f"spec-{uuid.uuid4().hex[:8]}",
             title=payload.title,
-            slug=payload.slug,
+            shortId=short_id,
             summary=payload.summary,
             category=payload.category,
             tags=payload.tags,
@@ -255,7 +274,7 @@ def create_app() -> Flask:
                 "Failed to persist spec",
                 500,
             )
-        return response_payload({"id": spec.id, "slug": spec.slug}, 201)
+        return response_payload({"id": spec.id, "shortId": spec.shortId}, 201)
 
     @app.route("/healthz")
     def healthz():

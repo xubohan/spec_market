@@ -16,6 +16,7 @@ import importlib
 
 app_module = importlib.import_module("backend.app")
 repository_module = importlib.import_module("backend.repository")
+mongo_module = importlib.import_module("backend.mongo")
 from backend.app import create_app
 from backend.repository import SpecRepository
 
@@ -26,7 +27,7 @@ def override_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Gene
         {
             "id": "spec-1",
             "title": "Test Spec",
-            "slug": "test-spec",
+            "shortId": "A1B2C3D4E5F6",
             "summary": "Summary",
             "category": "test",
             "tags": ["tag"],
@@ -38,9 +39,12 @@ def override_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Gene
     ]
     data_path = tmp_path / "specs.json"
     data_path.write_text(json.dumps(data), encoding="utf-8")
+    mongo_module._collection = mongo_module._InMemoryCollection()
+    mongo_module._client = None
     repo = SpecRepository(data_path=data_path)
     monkeypatch.setattr(app_module, "repository", repo)
     monkeypatch.setattr(repository_module, "repository", repo)
+    app_module.cache.clear()
     yield
 
 
