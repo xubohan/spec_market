@@ -31,12 +31,15 @@ class SpecRepository:
         self._load()
 
     def _load(self) -> None:
-        with open(self.data_path, "r", encoding="utf-8") as f:
-            raw_specs = json.load(f)
         self.specs: Dict[str, Spec] = {}
-        for raw in raw_specs:
-            spec = self._spec_from_raw(raw)
-            self.specs[spec.slug] = spec
+        if self.data_path.exists():
+            with open(self.data_path, "r", encoding="utf-8") as f:
+                raw_specs = json.load(f)
+            for raw in raw_specs:
+                spec = self._spec_from_raw(raw)
+                self.specs[spec.slug] = spec
+        else:
+            logging.info("Spec data file %s not found; loading from MongoDB only", self.data_path)
         self._merge_from_mongo()
 
     def _ensure_timezone(self, value: Any) -> datetime:
