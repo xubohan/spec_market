@@ -15,6 +15,15 @@ const ScrollContainer = ({ children }: { children: ReactNode }) => (
 );
 
 export const MarkdownView = ({ markdown, html }: Props) => {
+  if (html && html.trim().length > 0) {
+    const sanitized = DOMPurify.sanitize(html);
+    return (
+      <ScrollContainer>
+        <div className="markdown-content" dangerouslySetInnerHTML={{ __html: sanitized }} />
+      </ScrollContainer>
+    );
+  }
+
   if (markdown && markdown.trim().length > 0) {
     return (
       <ScrollContainer>
@@ -25,15 +34,6 @@ export const MarkdownView = ({ markdown, html }: Props) => {
         >
           {markdown}
         </ReactMarkdown>
-      </ScrollContainer>
-    );
-  }
-
-  if (html && html.trim().length > 0) {
-    const sanitized = DOMPurify.sanitize(html);
-    return (
-      <ScrollContainer>
-        <div className="markdown-content" dangerouslySetInnerHTML={{ __html: sanitized }} />
       </ScrollContainer>
     );
   }

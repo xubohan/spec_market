@@ -95,7 +95,7 @@ web/
 
 #### 1) Home
 
-* 顶部居中大搜索框（placeholder “Search with keywords”）
+* 顶部居中大搜索框（placeholder “Search with keywords”），仅在 Home 显示，切换到其他页面时隐藏搜索以保持界面简洁。
 * 快捷筛选 Pill：`Today | Latest`（点击切换查询参数）
 * 列表区：`SpecCard` 瀑布式网格（2 列/桌面，1 列/移动）
 
@@ -111,7 +111,7 @@ web/
 #### 3) Spec 详情（/specs/:shortId）
 
 * 标题区：标题、Short ID（展示为 16 位 base62 短链）、类别/标签 chips、更新时间
-* 主栏（左）：`MarkdownView`（优先使用 React Markdown 渲染 `contentMd`，保留 `contentHtml` 兜底，内置可滚动容器）
+* 主栏（左）：`MarkdownView`（优先渲染后端预处理好的 `contentHtml` 并使用 sanitize 过的输出，若缺失则回退至 React Markdown 渲染 `contentMd`，内置可滚动容器）
 * 侧栏（右）：
 
   * **Actions 卡片**：
@@ -154,7 +154,7 @@ web/
 * `SidebarNav({active: 'home'|'categories'|'tags'})`
 * `SearchBar({defaultQuery, onSearch})`
 * `SpecCard({title, shortId, summary, tags, updatedAt})`
-* `MarkdownView({markdown?: string, html?: string})`
+* `MarkdownView({markdown?: string, html?: string})`（先尝试渲染 sanitize 后的 `html`，再回退到 Markdown 文本）
 * `Toc({items: TocItem[], onJump})`
 * `CopyMarkdownButton({shortId})`
 * `DownloadButton({shortId})`

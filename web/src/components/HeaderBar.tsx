@@ -23,12 +23,12 @@ export const HeaderBar = () => {
     navigate({ pathname: '/', search: next.toString() });
   };
 
-  const showFilters = location.pathname === '/';
+  const isHome = location.pathname === '/';
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <SearchBar />
-      {showFilters && (
+      {isHome && <SearchBar />}
+      {isHome && (
         <div className="flex items-center gap-2">
           {filters.map((filter) => (
             <button
