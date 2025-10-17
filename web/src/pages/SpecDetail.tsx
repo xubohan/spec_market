@@ -29,9 +29,9 @@ export const SpecDetailPage = () => {
               </span>
             ))}
           </div>
-          <p className="mt-3 text-sm text-muted">
+          {/* <p className="mt-3 text-sm text-muted">
             Updated {new Date(data.updatedAt).toLocaleString()} · v{data.version} · {data.category}
-          </p>
+          </p> */}
         </div>
         <MarkdownView markdown={data.contentMd} html={data.contentHtml} />
       </article>
