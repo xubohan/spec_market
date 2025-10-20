@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiRequestError, useDeleteSpec, useSpecDetail } from '../lib/api';
 import { MarkdownView } from '../components/MarkdownView';
@@ -11,9 +11,14 @@ export const SpecDetailPage = () => {
   const { shortId = '' } = useParams();
   const { data, isLoading } = useSpecDetail(shortId);
   const navigate = useNavigate();
-  const { token } = useAdminToken();
+  const { token, setToken } = useAdminToken();
   const deleteMutation = useDeleteSpec();
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [localToken, setLocalToken] = useState(() => token ?? '');
+
+  useEffect(() => {
+    setLocalToken(token ?? '');
+  }, [token]);
 
   if (isLoading) {
     return <p className="text-muted">Loading...</p>;
@@ -28,7 +33,7 @@ export const SpecDetailPage = () => {
       return;
     }
     if (!token) {
-      setMessage('Please save your Admin-Token before deleting this spec.');
+      setMessage({ type: 'error', text: 'Please save your Admin-Token before deleting this spec.' });
       return;
     }
     const confirmed = window.confirm('Are you sure you want to delete this spec? This action cannot be undone.');
@@ -41,11 +46,16 @@ export const SpecDetailPage = () => {
       navigate('/', { replace: true });
     } catch (error) {
       if (error instanceof ApiRequestError) {
-        setMessage(error.statusMsg);
+        setMessage({ type: 'error', text: error.statusMsg });
       } else {
-        setMessage((error as Error).message);
+        setMessage({ type: 'error', text: (error as Error).message });
       }
     }
+  };
+
+  const handleSaveToken = () => {
+    setToken(localToken || null);
+    setMessage({ type: 'success', text: 'Admin token saved.' });
   };
 
   const formattedUpdatedAt = new Date(data.updatedAt).toLocaleString();
@@ -97,7 +107,34 @@ export const SpecDetailPage = () => {
               </button>
             </div>
           </div>
-          {message && <p className="mt-4 text-xs text-red-600">{message}</p>}
+          <div className="mt-4 space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted" htmlFor="admin-token-input">
+              Admin-Token
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="admin-token-input"
+                value={localToken}
+                onChange={(event) => setLocalToken(event.target.value)}
+                placeholder="Enter Admin-Token"
+                className="flex-1 rounded-lg border border-muted/30 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleSaveToken}
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+              >
+                Save Token
+              </button>
+            </div>
+          </div>
+          {message && (
+            <p
+              className={`mt-4 text-xs ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}
+            >
+              {message.text}
+            </p>
+          )}
         </div>
         <div className="rounded-3xl border border-muted/20 bg-white/90 p-6 shadow-lg">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Meta</h3>

@@ -3,6 +3,8 @@
 node_modules/
 web/node_modules/
 web/dist/
+.venv/
+backend/.venv/
 .pytest_cache/
 *.tsbuildinfo
 .env

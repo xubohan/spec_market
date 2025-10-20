@@ -118,6 +118,7 @@ web/
     * 📋 Copy Markdown（调用 `/api/specs/:shortId/raw` → clipboard）
     * ⬇️ Download .md（直链 `/api/specs/:shortId/download.md`）
     * ✏️ Edit Spec（跳转 `/specs/:shortId/edit`，继续使用 Admin-Token 保护）
+    * 🗑️ Delete Spec（需先在同卡片保存 Admin-Token，删除请求携带 `X-Admin-Token`，成功后返回首页）
   * **Meta 卡片**：Author、Category、Tags、Updated、Created、Short ID（16 位 base62，位于标题下方并在 Meta 区域醒目展示，方便复制分享）
 
 **可及性**
