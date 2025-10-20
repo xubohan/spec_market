@@ -1,4 +1,4 @@
-import { useMutation, useQuery, UseQueryOptions } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ApiResponse, Category, PaginatedSpecs, SpecDetail, Tag } from '../types/spec';
 
@@ -212,8 +212,10 @@ type UpdateSpecPayload = {
 };
 
 /** PUT /specmarket/v1/updateSpec */
-export const useUpdateSpec = () =>
-  useMutation({
+export const useUpdateSpec = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
     mutationFn: async (payload: UpdateSpecPayload) => {
       const response = await fetch(buildUrl('updateSpec'), {
         method: 'PUT',
@@ -234,7 +236,54 @@ export const useUpdateSpec = () =>
       });
       return extractApiData<{ shortId: string; updatedAt: string }>(response);
     },
+    onSuccess: (result, variables) => {
+      const updatedAt = result.updatedAt;
+
+      queryClient.setQueryData<SpecDetail>(['spec', variables.shortId], (previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          title: variables.title,
+          summary: variables.summary,
+          category: variables.category,
+          tags: variables.tags,
+          author: variables.author,
+          contentMd: variables.contentMd,
+          updatedAt,
+        };
+      });
+
+      queryClient.setQueriesData<PaginatedSpecs>({ queryKey: ['specs'] }, (previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          items: previous.items.map((item) =>
+            item.shortId === variables.shortId
+              ? {
+                  ...item,
+                  title: variables.title,
+                  summary: variables.summary,
+                  category: variables.category,
+                  tags: variables.tags,
+                  author: variables.author,
+                  updatedAt,
+                }
+              : item,
+          ),
+        };
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['spec', variables.shortId] });
+      queryClient.invalidateQueries({ queryKey: ['specs'] });
+    },
   });
+};
 
 /** Build app route (not API) for spec detail page */
 export const buildSpecLink = (shortId: string) => `/specs/${shortId}`;

@@ -23,6 +23,13 @@
 - **Implementation**: 后端新增 `PUT /specmarket/v1/updateSpec`，基于 Admin-Token 认证并复用 Markdown 渲染与 TOC 生成流程；前端在详情页加入 “Edit Spec” 跳转，新增 `/specs/:shortId/edit` 页面加载原始 Markdown 并支持在线修改。
 - **Verification**: 手动与自动化覆盖 `pytest backend/tests` 新增的更新接口用例，前端通过本地开发确认编辑后详情页即时刷新、缓存失效，文档同步描述 Admin Edit 流程。
 
+## updatedAt timestamp drift after edits
+
+- **Date**: 2025-10-26
+- **Issue**: 编辑 spec 并保存后，详情页 Meta 的 `updatedAt` 没有同步刷新，列表卡片也显示旧的日期；原因是后端 JSON 序列化直接 `str(datetime)`，浏览器无法解析该格式，TanStack Query 的缓存也没有强制失效，导致界面沿用旧数据。
+- **Fix**: 统一后端响应的时间字段为 RFC 3339（`2025-10-26T09:30:45Z`）格式，并在 `useUpdateSpec` 成功回调中同步更新缓存、再触发 `invalidateQueries` 强制重新获取详情与列表。
+- **Verification**: 运行 `pytest` 与 `npm run build`，并在本地修改文档后确认详情页 Meta 立即显示新的 `updatedAt`，Markdown 内容实时更新。
+
 ## can't compare offset-naive and offset-aware datetimes
 
 - **Date**: 2025-10-17

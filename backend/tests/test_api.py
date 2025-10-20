@@ -8,6 +8,10 @@ from backend.models import BusinessErrorCode
 from backend import mongo as mongo_module
 
 
+def _parse_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
 def test_list_specs(client):
     resp = client.get("/specmarket/v1/listSpecs")
     assert resp.status_code == 200
@@ -174,6 +178,12 @@ def test_error_response_contains_trace_and_code(client):
 
 
 def test_update_spec_endpoint(client):
+    original_detail = client.get(
+        "/specmarket/v1/getSpecDetail",
+        query_string={"shortId": "A1B2C3D4E5F6G7H8"},
+    ).get_json()["data"]
+    original_updated_at = original_detail["updatedAt"]
+
     update_payload = {
         "shortId": "A1B2C3D4E5F6G7H8",
         "title": "Test Spec Updated",
@@ -196,6 +206,11 @@ def test_update_spec_endpoint(client):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["status_code"] == BusinessErrorCode.SUCCESS
+    response_updated_at = body["data"]["updatedAt"]
+    assert "T" in response_updated_at
+    assert response_updated_at.endswith("Z")
+    assert response_updated_at != original_updated_at
+    assert _parse_timestamp(response_updated_at) > _parse_timestamp(original_updated_at)
     detail = client.get(
         "/specmarket/v1/getSpecDetail",
         query_string={"shortId": update_payload["shortId"]},
@@ -203,6 +218,8 @@ def test_update_spec_endpoint(client):
     assert detail["summary"] == "Updated summary"
     assert detail["title"] == "Test Spec Updated"
     assert detail["contentMd"].strip().endswith("Updated test content")
+    assert "T" in detail["updatedAt"]
+    assert detail["updatedAt"] == response_updated_at
 
     collection = mongo_module._collection
     assert isinstance(collection, mongo_module._InMemoryCollection)

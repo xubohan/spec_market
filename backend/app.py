@@ -46,9 +46,18 @@ def create_app() -> Flask:
         response.headers["X-Trace-Id"] = g.get("trace_id", "")
         return response
 
+    def _json_default(value: Any) -> Any:
+        if isinstance(value, datetime):
+            dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            iso = dt.astimezone(timezone.utc).isoformat()
+            return iso.replace("+00:00", "Z")
+        if isinstance(value, set):
+            return list(value)
+        return str(value)
+
     def response_payload(data: Optional[Dict[str, Any]] = None, status: int = 200) -> Response:
         payload = APIResponse.success(data=data).dict()
-        response = make_response(json.dumps(payload, default=str), status)
+        response = make_response(json.dumps(payload, default=_json_default), status)
         response.headers["Content-Type"] = "application/json"
         return response
 
@@ -124,7 +133,7 @@ def create_app() -> Flask:
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         spec_dict = spec.dict(by_alias=True)
-        etag = compute_etag(json.dumps(spec_dict, default=str).encode("utf-8"))
+        etag = compute_etag(json.dumps(spec_dict, default=_json_default).encode("utf-8"))
         last_modified = spec.updatedAt.astimezone(timezone.utc)
         if request.headers.get("If-None-Match") == etag:
             response = make_response("", 304)
