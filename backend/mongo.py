@@ -29,6 +29,12 @@ class _InMemoryCollection:
     def find(self, filter: Dict[str, Any] | None = None) -> Iterable[Dict[str, Any]]:
         return [dict(value) for value in self.store.values()]
 
+    def delete_one(self, filter: Dict[str, Any]) -> None:
+        short_id = filter.get("shortId")
+        if short_id is None:
+            raise ValueError("shortId filter is required for in-memory fallback")
+        self.store.pop(short_id, None)
+
 
 def _init_client() -> None:
     global _client, _collection
@@ -64,3 +70,11 @@ def list_spec_documents() -> List[Dict[str, Any]]:
         logging.warning("Mongo collection does not support find(); returning empty list")
         return []
     return [dict(doc) for doc in cursor]
+
+
+def delete_spec_document(short_id: str) -> None:
+    collection = get_collection()
+    try:
+        collection.delete_one({"shortId": short_id})  # type: ignore[attr-defined]
+    except AttributeError:
+        logging.warning("Mongo collection does not support delete_one(); skipping delete")

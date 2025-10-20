@@ -179,5 +179,14 @@ class SpecRepository:
         spec = self._spec_from_raw(document)
         self.specs[spec.shortId] = spec
 
+    def delete_spec(self, short_id: str) -> bool:
+        removed = self.specs.pop(short_id, None) is not None
+        if removed:
+            try:
+                self._persist()
+            except OSError as exc:  # pragma: no cover - defensive
+                logging.warning("Failed to persist spec deletion: %s", exc)
+        return removed
+
 
 repository = SpecRepository()

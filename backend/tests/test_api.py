@@ -237,3 +237,37 @@ def test_update_spec_endpoint(client):
         "createdAt",
         "updatedAt",
     }
+
+
+def test_delete_spec_endpoint(client):
+    unauthorized = client.delete(
+        "/specmarket/v1/deleteSpec",
+        json={"shortId": "A1B2C3D4E5F6G7H8"},
+    )
+    assert unauthorized.status_code == 401
+    assert unauthorized.get_json()["status_code"] == BusinessErrorCode.UNAUTHORIZED
+
+    resp = client.delete(
+        "/specmarket/v1/deleteSpec",
+        json={"shortId": "A1B2C3D4E5F6G7H8"},
+        headers={"X-Admin-Token": settings.admin_token},
+    )
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["status_code"] == BusinessErrorCode.SUCCESS
+    assert payload["data"]["shortId"] == "A1B2C3D4E5F6G7H8"
+
+    detail = client.get(
+        "/specmarket/v1/getSpecDetail",
+        query_string={"shortId": "A1B2C3D4E5F6G7H8"},
+    )
+    assert detail.status_code == 404
+    assert detail.get_json()["status_code"] == BusinessErrorCode.NOT_FOUND
+
+    from backend import repository as repository_module
+
+    assert repository_module.repository.get_spec("A1B2C3D4E5F6G7H8") is None
+
+    collection = mongo_module._collection
+    assert isinstance(collection, mongo_module._InMemoryCollection)
+    assert "A1B2C3D4E5F6G7H8" not in collection.store

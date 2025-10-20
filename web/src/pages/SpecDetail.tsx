@@ -1,12 +1,18 @@
-import { Link, useParams } from 'react-router-dom';
-import { useSpecDetail } from '../lib/api';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ApiRequestError, useDeleteSpec, useSpecDetail } from '../lib/api';
 import { MarkdownView } from '../components/MarkdownView';
 import { CopyMarkdownButton } from '../components/CopyMarkdownButton';
 import { DownloadButton } from '../components/DownloadButton';
+import { useAdminToken } from '../lib/auth';
 
 export const SpecDetailPage = () => {
   const { shortId = '' } = useParams();
   const { data, isLoading } = useSpecDetail(shortId);
+  const navigate = useNavigate();
+  const { token } = useAdminToken();
+  const deleteMutation = useDeleteSpec();
+  const [message, setMessage] = useState<string | null>(null);
 
   if (isLoading) {
     return <p className="text-muted">Loading...</p>;
@@ -15,6 +21,31 @@ export const SpecDetailPage = () => {
   if (!data) {
     return <p className="text-muted">Spec not found.</p>;
   }
+
+  const handleDelete = async () => {
+    if (!data) {
+      return;
+    }
+    if (!token) {
+      setMessage('Please save your Admin-Token before deleting this spec.');
+      return;
+    }
+    const confirmed = window.confirm('Are you sure you want to delete this spec? This action cannot be undone.');
+    if (!confirmed) {
+      return;
+    }
+    setMessage(null);
+    try {
+      await deleteMutation.mutateAsync({ token, shortId: data.shortId });
+      navigate('/', { replace: true });
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        setMessage(error.statusMsg);
+      } else {
+        setMessage((error as Error).message);
+      }
+    }
+  };
 
   return (
     <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -43,6 +74,14 @@ export const SpecDetailPage = () => {
             >
               Edit Spec
             </Link>
+            <button
+              onClick={handleDelete}
+              className="rounded-lg bg-red-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete Spec'}
+            </button>
+            {message && <p className="text-xs text-red-600">{message}</p>}
           </div>
         </div>
         <div className="rounded-2xl bg-card p-5 shadow-sm">

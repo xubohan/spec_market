@@ -21,7 +21,7 @@ from .models import (
     UpdatePayload,
     spec_to_document,
 )
-from .mongo import save_spec_document
+from .mongo import delete_spec_document, save_spec_document
 from .repository import repository
 from .utils import derive_short_id, generate_short_id
 
@@ -124,6 +124,31 @@ def create_app() -> Flask:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         spec_dict = spec.dict(by_alias=True)
         return response_payload(spec_dict)
+
+    @app.route("/specmarket/v1/deleteSpec", methods=["DELETE"])
+    @require_admin_token
+    def delete_spec():
+        payload = request.get_json(silent=True)
+        short_id = None
+        if isinstance(payload, dict):
+            short_id = payload.get("shortId")
+        if not short_id or not isinstance(short_id, str):
+            return handle_error(BusinessErrorCode.INVALID_ARG, "shortId is required", 400)
+
+        spec = repository.get_spec(short_id)
+        if not spec:
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
+
+        removed = repository.delete_spec(short_id)
+        if not removed:
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
+
+        try:
+            delete_spec_document(short_id)
+        except pymongo_errors.PyMongoError as exc:
+            logging.warning("Failed to delete spec from MongoDB: %s", exc)
+
+        return response_payload({"shortId": short_id})
 
     @app.route("/specmarket/v1/getSpecRaw")
     def get_spec_raw():

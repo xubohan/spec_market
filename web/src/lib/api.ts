@@ -290,6 +290,48 @@ export const useUpdateSpec = () => {
   });
 };
 
+type DeleteSpecPayload = {
+  token: string;
+  shortId: string;
+};
+
+/** DELETE /specmarket/v1/deleteSpec */
+export const useDeleteSpec = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ token, shortId }: DeleteSpecPayload) => {
+      const response = await fetch(buildUrl('deleteSpec'), {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Token': token,
+        },
+        body: JSON.stringify({ shortId }),
+        cache: 'no-store',
+      });
+      return extractApiData<{ shortId: string }>(response);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.removeQueries({ queryKey: ['spec', variables.shortId] });
+      queryClient.setQueriesData<PaginatedSpecs>({ queryKey: ['specs'] }, (previous) => {
+        if (!previous) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          total: Math.max(previous.total - 1, 0),
+          items: previous.items.filter((item) => item.shortId !== variables.shortId),
+        };
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['specs'] });
+    },
+  });
+};
+
 /** Build app route (not API) for spec detail page */
 export const buildSpecLink = (shortId: string) => `/specs/${shortId}`;
 
