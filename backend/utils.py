@@ -4,12 +4,10 @@ import hashlib
 import re
 import secrets
 from datetime import datetime
-from typing import Iterable, List
+from typing import List
 
 import bleach
 from markdown import markdown
-
-HEADING_PATTERN = re.compile(r"^(#{2,6})\\s+(.*)")
 
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 SHORT_ID_LENGTH = 16
@@ -19,18 +17,6 @@ SHORT_ID_PATTERN = re.compile(rf"^[{BASE62_ALPHABET}]{{{SHORT_ID_LENGTH}}}$")
 def slugify(text: str) -> str:
     sanitized = re.sub(r"[^a-zA-Z0-9\-\s]", "", text).strip().lower()
     return re.sub(r"\s+", "-", sanitized)
-
-
-def build_toc(markdown_lines: Iterable[str]) -> List[dict]:
-    toc = []
-    for line in markdown_lines:
-        match = HEADING_PATTERN.match(line)
-        if not match:
-            continue
-        level = len(match.group(1))
-        text = match.group(2).strip()
-        toc.append({"text": text, "id": slugify(text), "level": level})
-    return toc
 
 
 ALLOWED_TAGS = list(bleach.sanitizer.ALLOWED_TAGS) + [
@@ -60,7 +46,7 @@ ALLOWED_ATTRIBUTES = {
 
 
 def render_markdown(md_text: str) -> str:
-    html = markdown(md_text, extensions=["extra", "codehilite", "toc", "tables"])
+    html = markdown(md_text, extensions=["extra", "codehilite", "tables"])
     return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES)
 
 

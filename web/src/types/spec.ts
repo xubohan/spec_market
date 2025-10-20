@@ -10,16 +10,9 @@ export type SpecSummary = {
   updatedAt: string;
 };
 
-export type TocItem = {
-  text: string;
-  id: string;
-  level: number;
-};
-
 export type SpecDetail = SpecSummary & {
   contentHtml?: string;
   contentMd?: string;
-  toc?: TocItem[];
 };
 
 export type PaginatedSpecs = {

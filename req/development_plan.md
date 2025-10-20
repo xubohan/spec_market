@@ -8,7 +8,7 @@
 * **Upload** 作为临时管理入口，允许内网成员通过 Admin-Token 上传 `spec.md`（支持文本或文件）。
   * Upload 表单限定仅接受 `.md` 文件：文件选择器设置 `accept=".md,text/markdown"`，提交前追加校验防止非 Markdown 文件被上传。
 * **Edit** 页面允许作者在详情页跳转后，通过 Admin-Token 再次修改 Markdown 与元信息，避免上传后才发现错误。
-* 详情页仅 **Overview**（React Markdown 渲染，滚动容器防止页面被拉长），右侧提供 **复制 Markdown**、**下载 .md**、**Meta/TOC**。
+* 详情页仅 **Overview**（React Markdown 渲染，滚动容器防止页面被拉长），右侧提供 **复制 Markdown**、**下载 .md**、**Meta**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
 * 前端从所有 API 统一接收 `{ status_code, status_msg, data }` 包装结构；仅当 `status_code === 0` 视为成功。
@@ -50,7 +50,6 @@ web/
       TagChip.tsx
       CategoryBadge.tsx
       MarkdownView.tsx
-      Toc.tsx
       CopyMarkdownButton.tsx
       DownloadButton.tsx
       Pagination.tsx
@@ -120,7 +119,6 @@ web/
     * ⬇️ Download .md（直链 `/api/specs/:shortId/download.md`）
     * ✏️ Edit Spec（跳转 `/specs/:shortId/edit`，继续使用 Admin-Token 保护）
   * **Meta 卡片**：Author、Category、Tags、Updated、Created、Short ID（16 位 base62，位于标题下方并在 Meta 区域醒目展示，方便复制分享）
-  * **TOC 卡片**：当前文档标题层级目录，点击锚点定位、滚动高亮
 
 **可及性**
 
@@ -155,7 +153,6 @@ web/
 * `SearchBar({defaultQuery, onSearch})`
 * `SpecCard({title, shortId, summary, tags, updatedAt})`
 * `MarkdownView({markdown?: string, html?: string})`（先尝试渲染 sanitize 后的 `html`，再回退到 Markdown 文本）
-* `Toc({items: TocItem[], onJump})`
 * `CopyMarkdownButton({shortId})`
 * `DownloadButton({shortId})`
 * `Pagination({page, total, onChange})`
@@ -190,7 +187,7 @@ web/
 ## 验收标准（前端）
 
 1. 首页搜索与分页可用，空态/加载态完整
-2. 详情页 Markdown 正确渲染（标题锚点、表格、代码高亮、TOC 同步）
+2. 详情页 Markdown 正确渲染（标题锚点、表格、代码高亮）
 3. 复制/下载操作成功（Toast 提示）
 4. Categories/Tags 能筛出正确文档
 5. Lighthouse Performance/Best Practices/SEO/Accessibility ≥ 90（桌面）
@@ -203,7 +200,7 @@ web/
 
 * 提供 **公开只读 REST**：列表/搜索、单文档详情（md/html）、原文/下载、类目/标签统计。
 * 对写接口（新建/更新）先保留但不上线（或仅内网）。
-* 连接 MongoDB，保存 Markdown 原文与预渲 HTML/TOC。
+* 连接 MongoDB，保存 Markdown 原文与预渲 HTML。
 * QPS 低，优先简洁与可维护性。
 
 ---
@@ -214,7 +211,7 @@ web/
 * **框架**：Flask 3.x
 * **Mongo**：PyMongo（或 Flask-PyMongo）
 * **数据校验**：pydantic v2（请求/响应 DTO）
-* **Markdown**：markdown-it-py + mdit-py-plugins（gfm/attrs/toc），自定义提取 TOC
+* **Markdown**：markdown-it-py + mdit-py-plugins（gfm/attrs）
 * **HTML 安全**：bleach（服务端 sanitize 一次）
 * **缓存**：Flask-Caching（Simple 或 Redis，可选）
 * **限流**：Flask-Limiter（后期开启写接口再用）
@@ -234,7 +231,7 @@ api/
       service.py
       repository.py
       schema.py         # pydantic models
-      markdown.py       # md->html/toc/summary
+      markdown.py       # md->html/summary
     meta/
       routes.py         # categories/tags
   models/
@@ -280,10 +277,9 @@ Spec {
 ## 预渲管道（保存/更新时）
 
 1. `contentMd` → markdown-it-py 渲染 HTML（仅用于响应缓存，不落库）
-2. 生成 headings 锚点（slugify H2/H3…） → `toc[]`（仅保存在内存模型）
-3. `bleach.clean`（白名单：`p, h1-6, a, code, pre, table, thead, tbody, tr, td, th, ul, ol, li, blockquote, img, strong, em` 等；属性白名单包括 `href, target, rel, src, alt, class, id`）
-4. 提取 `summary`（首段文本 160 字内）
-5. 存库：`shortId`、`author`、`category`、`tags`、`summary`、`contentMd`、`createdAt`、`updatedAt`
+2. `bleach.clean`（白名单：`p, h1-6, a, code, pre, table, thead, tbody, tr, td, th, ul, ol, li, blockquote, img, strong, em` 等；属性白名单包括 `href, target, rel, src, alt, class, id`）
+3. 提取 `summary`（首段文本 160 字内）
+4. 存库：`shortId`、`author`、`category`、`tags`、`summary`、`contentMd`、`createdAt`、`updatedAt`
 
 ---
 
@@ -329,7 +325,6 @@ Spec {
     "shortId":"Ab3k9LmNpQr2StUv",
     "category":"maps",
     "tags":["maps","location-services"],
-    "toc":[{"text":"Overview","id":"overview","level":2}],
     "contentMd":"...",            // 当 format=md/both
     "contentHtml":"...",          // 当 format=html/both
     "updatedAt":"2025-10-12T08:00:00Z",
@@ -343,7 +338,7 @@ Spec {
 * 顶部先输入并保存 **Admin-Token**（LocalStorage 持久化，模拟简单鉴权）。
 * 上传表单包含：标题、Short ID（16 位 base62 校验，输入框下方提示 `e.g. Ab3k9LmNpQr2StUv`）、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
 * 成功上传后清空表单并提示 `Upload successful for <shortId>`。
-* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<shortId>.md` 并存储 HTML、TOC。
+* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<shortId>.md` 并存储 HTML。
 * 当前上传端点保持宽松：后端仍接受任意文件类型，依赖前端的 `.md` 限制；若后续需要可在 Flask 层再加 MIME/扩展名校验。
 
 ### 3) 获取原文（复制）
@@ -403,7 +398,7 @@ Spec {
 #### Upload 接口（POST `/specmarket/v1/uploadSpec`）
 
 * 依赖 MongoDB（`specs` 集合）存储上传文档：字段包括 `shortId`（唯一索引，16 位 base62）、`author`、`category`、`tags`、`summary`、`contentMd`、`title`、`createdAt`、`updatedAt`。
-* 上传流程：读取表单（文本或文件内容）→ 渲染 Markdown 与 TOC（仅用于响应）→ 使用 `update_one(..., upsert=True)` 保存，若命中重复 `shortId` 则覆盖旧记录并刷新 `updatedAt`。
+* 上传流程：读取表单（文本或文件内容）→ 渲染 Markdown（仅用于响应）→ 使用 `update_one(..., upsert=True)` 保存，若命中重复 `shortId` 则覆盖旧记录并刷新 `updatedAt`。
 * 成功写入 Mongo 后刷新内存缓存（`SpecRepository`），不再写入 `backend/uploads/` 或更新 JSON 文件，所有持久化交给 Mongo；异常时写入标准错误响应并附带 traceId。
 * 本地开发：通过 `.env`/环境变量暴露 `MONGODB_URI=mongodb://localhost:27017/specdb`、`MONGODB_DB=specdb`，确保上传接口默认即可连上本地实例。
 
@@ -487,7 +482,7 @@ PORT=5000
 ## 验收标准（后端）
 
 1. 列表/详情/原文/下载/类目/标签接口按契约返回
-2. Markdown → HTML 渲染正确（表格、代码、锚点、TOC）且已 sanitize
+2. Markdown → HTML 渲染正确（表格、代码、锚点）且已 sanitize
 3. 详情接口携带 `ETag` 与 `Last-Modified`，条件请求返回 304
 4. 错误模型一致、日志包含 traceId
 5. 在 10～20 并发下 P95 符合目标

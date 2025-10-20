@@ -3,7 +3,6 @@ import { useSpecDetail } from '../lib/api';
 import { MarkdownView } from '../components/MarkdownView';
 import { CopyMarkdownButton } from '../components/CopyMarkdownButton';
 import { DownloadButton } from '../components/DownloadButton';
-import { Toc } from '../components/Toc';
 
 export const SpecDetailPage = () => {
   const { shortId = '' } = useParams();
@@ -75,7 +74,6 @@ export const SpecDetailPage = () => {
             </div>
           </dl>
         </div>
-        <Toc items={data.toc} />
       </aside>
     </section>
   );

@@ -31,12 +31,6 @@ _ERROR_MESSAGES = {
 }
 
 
-class TocItem(BaseModel):
-    text: str
-    id: str
-    level: int
-
-
 SHORT_ID_REGEX = re.compile(rf"^[{BASE62_ALPHABET}]{{{SHORT_ID_LENGTH}}}$")
 
 SHORT_ID_ERROR = f"shortId must be a {SHORT_ID_LENGTH}-character base62 string"
@@ -54,7 +48,6 @@ class Spec(BaseModel):
     updatedAt: datetime
     contentMd: str = Field(..., alias="contentMd")
     contentHtml: Optional[str] = None
-    toc: Optional[List[TocItem]] = None
 
     class Config:
         allow_population_by_field_name = True

@@ -24,14 +24,7 @@ from .models import (
 )
 from .mongo import save_spec_document
 from .repository import repository
-from .utils import (
-    build_toc,
-    compute_etag,
-    derive_short_id,
-    generate_short_id,
-    http_datetime,
-    render_markdown,
-)
+from .utils import compute_etag, derive_short_id, generate_short_id, http_datetime, render_markdown
 
 
 cache = Cache(config={"CACHE_TYPE": settings.cache_backend})
@@ -245,7 +238,6 @@ def create_app() -> Flask:
             return handle_error(BusinessErrorCode.INVALID_ARG, "author is required", 400)
         now = datetime.now(timezone.utc)
         html = render_markdown(content_md)
-        toc = build_toc(content_md.splitlines())
         existing = existing or (repository.get_spec(payload.shortId) if payload.shortId else None)
         created_at = existing.createdAt if existing else now
         if existing:
@@ -266,7 +258,6 @@ def create_app() -> Flask:
             createdAt=created_at,
             contentMd=content_md,
             contentHtml=html,
-            toc=toc,
             updatedAt=now,
         )
         document = spec_to_document(spec)
@@ -303,7 +294,6 @@ def create_app() -> Flask:
         now = datetime.now(timezone.utc)
         content_md = payload.contentMd
         html = render_markdown(content_md)
-        toc = build_toc(content_md.splitlines())
         spec = Spec(
             id=existing.id,
             title=payload.title,
@@ -315,7 +305,6 @@ def create_app() -> Flask:
             createdAt=existing.createdAt,
             contentMd=content_md,
             contentHtml=html,
-            toc=toc,
             updatedAt=now,
         )
         document = spec_to_document(spec)
