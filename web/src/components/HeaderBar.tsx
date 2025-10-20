@@ -25,27 +25,29 @@ export const HeaderBar = () => {
 
   const isHome = location.pathname === '/';
 
+  if (!isHome) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col items-center gap-4">
-      {isHome && <SearchBar />}
-      {isHome && (
-        <div className="flex items-center gap-2">
-          {filters.map((filter) => (
-            <button
-              key={filter.value}
-              onClick={() => handleFilter(filter.value)}
-              className={clsx(
-                'rounded-full px-4 py-2 text-sm font-medium transition',
-                active === filter.value
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-card text-muted shadow-sm hover:bg-primary/10'
-              )}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <SearchBar />
+      <div className="flex items-center gap-2">
+        {filters.map((filter) => (
+          <button
+            key={filter.value}
+            onClick={() => handleFilter(filter.value)}
+            className={clsx(
+              'rounded-full px-4 py-2 text-sm font-medium transition',
+              active === filter.value
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-card text-muted shadow-sm hover:bg-primary/10'
+            )}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

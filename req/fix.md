@@ -1,5 +1,19 @@
 # Fix Log
 
+## Spec detail layout iteration
+
+- **Date**: 2025-10-22
+- **Motivation**: 详情页仍然存在三层卡片的压迫感，操作按钮主次不清、Meta 卡片内的 shortId 溢出，影响浏览体验。
+- **Implementation**: 调整全局布局移除额外的内容外壳，让详情页仅保留标题区与 Markdown 内容两层视觉层级；将复制、下载、编辑、删除整合成统一的图标按钮组，弱化删除按钮并保留提示；Meta 信息卡片改为双列排布、支持 `break-all`，避免短链溢出。
+- **Verification**: 运行 `npm run build`，本地打开 Spec 详情页确认层级与操作按钮展示正常，并更新截图。
+
+## Spec detail layout visual refresh
+
+- **Date**: 2025-10-21
+- **Motivation**: 现有界面在导航高亮、正文与背景层次、右侧操作区按钮以及 Meta 信息排版上层级不清晰，重要信息难以快速聚焦。
+- **Implementation**: 重构左侧导航为分组结构并强化 active/hover 高亮，主内容区增加半透明卡片与投影，同时优化 Markdown 排版间距；在规格详情页中调整 Actions 为图标按钮+底部操作组，弱化删除按钮警示强度并新增 Meta 卡片图标化两列布局。
+- **Verification**: 运行 `npm run build` 并在本地浏览器确认详情页样式与交互正常，更新截图存档。
+
 ## Admin delete flow for specs
 
 - **Date**: 2025-10-20

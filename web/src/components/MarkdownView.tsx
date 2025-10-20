@@ -7,7 +7,7 @@ type Props = {
 };
 
 const ScrollContainer = ({ children }: { children: ReactNode }) => (
-  <div className="max-h-[70vh] overflow-y-auto rounded-2xl border border-muted/20 bg-white/80 p-6 shadow-inner">
+  <div className="max-h-[70vh] overflow-y-auto rounded-3xl border border-muted/15 bg-white p-6 shadow-lg">
     {children}
   </div>
 );

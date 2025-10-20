@@ -19,8 +19,12 @@ function AppLayout() {
         <ScrollRestoration />
         <div className="flex min-h-screen">
           <SidebarNav />
-          <main className="flex-1 px-8 py-6 lg:ml-64">
-            <div className="mx-auto flex max-w-5xl flex-col gap-6">
+          <main className="relative flex-1 px-6 py-10 lg:ml-64 lg:px-10">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/70 via-transparent to-primary/15"
+            />
+            <div className="relative z-10 mx-auto flex max-w-5xl flex-col gap-10">
               <HeaderBar />
               <Suspense fallback={<div>Loading...</div>}>
                 <Outlet />

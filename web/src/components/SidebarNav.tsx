@@ -2,29 +2,71 @@ import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Menu, X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import clsx from 'clsx';
 
-const navItems = [
-  { label: 'Home', to: '/' },
-  { label: 'Categories', to: '/categories' },
-  { label: 'Tags', to: '/tags' },
-  { label: 'Upload', to: '/upload' }
+const navSections = [
+  {
+    title: 'Navigation',
+    items: [
+      { label: 'Home', to: '/' },
+      { label: 'Categories', to: '/categories' },
+      { label: 'Tags', to: '/tags' },
+    ],
+  },
+  {
+    title: 'Management',
+    items: [{ label: 'Upload', to: '/upload' }],
+  },
 ];
 
+const NavItem = ({
+  item,
+  close,
+}: {
+  item: { label: string; to: string };
+  close?: () => void;
+}) => (
+  <NavLink
+    key={item.to}
+    to={item.to}
+    className={({ isActive }) =>
+      clsx(
+        'group relative flex items-center rounded-xl border border-transparent px-5 py-3 text-sm font-semibold transition-all',
+        isActive
+          ? 'border-primary/40 bg-primary/10 text-text shadow-sm'
+          : 'text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-text'
+      )
+    }
+    onClick={close}
+  >
+    {({ isActive }) => (
+      <>
+        <span
+          className={clsx(
+            'absolute left-2 top-1/2 h-8 w-1 -translate-y-1/2 rounded-full transition-all',
+            isActive ? 'bg-primary opacity-100' : 'bg-primary/40 opacity-0 group-hover:opacity-60'
+          )}
+          aria-hidden
+        />
+        <span className="pl-3">{item.label}</span>
+      </>
+    )}
+  </NavLink>
+);
+
 const NavContent = ({ close }: { close?: () => void }) => (
-  <nav className="flex flex-col gap-2">
-    {navItems.map((item) => (
-      <NavLink
-        key={item.to}
-        to={item.to}
-        className={({ isActive }) =>
-          `rounded-lg px-4 py-2 text-sm font-medium transition hover:bg-primary/10 ${
-            isActive ? 'bg-primary text-white' : 'text-muted'
-          }`
-        }
-        onClick={close}
-      >
-        {item.label}
-      </NavLink>
+  <nav className="flex flex-col gap-6">
+    {navSections.map((section) => (
+      <div key={section.title} className="space-y-2">
+        <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted/70">
+          {section.title}
+        </p>
+        <div className="flex flex-col gap-2">
+          {section.items.map((item) => (
+            <NavItem key={item.to} item={item} close={close} />
+          ))}
+        </div>
+      </div>
     ))}
   </nav>
 );
@@ -40,12 +82,12 @@ export const SidebarNav = () => {
       >
         <Menu className="h-5 w-5" />
       </button>
-      <aside className="fixed hidden h-full w-64 flex-col justify-between bg-background px-6 py-8 lg:flex">
+      <aside className="fixed hidden h-full w-64 flex-col justify-between bg-[#F2ECE6] px-6 py-8 shadow-[inset_-1px_0_0_rgba(0,0,0,0.05)] lg:flex">
         <div className="space-y-6">
-          <div className="text-2xl font-bold tracking-tight">Spec.so</div>
+          <div className="text-2xl font-bold tracking-tight text-text">Spec.so</div>
           <NavContent />
         </div>
-        <div className="text-sm text-muted">Settings (coming soon)</div>
+        <div className="text-sm text-muted/80">Settings (coming soon)</div>
       </aside>
       <Transition show={open} as={Fragment}>
         <Dialog onClose={() => setOpen(false)} className="relative z-50 lg:hidden">
