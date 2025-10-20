@@ -110,7 +110,7 @@ web/
 #### 3) Spec 详情（/specs/:shortId）
 
 * 标题区：标题、Short ID（展示为 16 位 base62 短链）、类别/标签 chips、更新时间
-* 主栏（左）：`MarkdownView`（优先渲染后端预处理好的 `contentHtml` 并使用 sanitize 过的输出，若缺失则回退至 React Markdown 渲染 `contentMd`，内置可滚动容器）
+* 主栏（左）：`MarkdownView`（直接使用 React Markdown 渲染后端返回的 `contentMd`，内置可滚动容器）
 * 侧栏（右）：
 
   * **Actions 卡片**：
@@ -129,7 +129,7 @@ web/
 #### 4) Spec 编辑（/specs/:shortId/edit）
 
 * 顶部显示当前 Short ID、跳转回详情页的按钮以及 Admin-Token 输入框（复用 Upload 页逻辑，保存在 localStorage）。
-* 表单字段与上传一致：Title、Category、Tags、Author、Summary、Markdown 文本，初始值来自 `useSpecDetail(shortId, 'md')`。
+* 表单字段与上传一致：Title、Category、Tags、Author、Summary、Markdown 文本，初始值来自 `useSpecDetail(shortId)`。
 * 提交时调用 `PUT /specmarket/v1/updateSpec`，Header 携带 `X-Admin-Token`；成功后提示 "Spec updated successfully." 并刷新缓存。
 * 表单右下角按钮在请求中显示 `Updating...`，失败提示来自后端 `status_msg`。
 
@@ -314,7 +314,7 @@ Spec {
 
 ### 2) 单文档详情
 
-`GET /api/specs/:shortId?format=md|html|both`（默认 `md`）
+`GET /api/specs/:shortId`
 
 ```json
 {
@@ -325,8 +325,7 @@ Spec {
     "shortId":"Ab3k9LmNpQr2StUv",
     "category":"maps",
     "tags":["maps","location-services"],
-    "contentMd":"...",            // 当 format=md/both
-    "contentHtml":"...",          // 当 format=html/both
+    "contentMd":"...",            // Markdown 内容
     "updatedAt":"2025-10-12T08:00:00Z",
     "version": 3
   }
@@ -338,7 +337,7 @@ Spec {
 * 顶部先输入并保存 **Admin-Token**（LocalStorage 持久化，模拟简单鉴权）。
 * 上传表单包含：标题、Short ID（16 位 base62 校验，输入框下方提示 `e.g. Ab3k9LmNpQr2StUv`）、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
 * 成功上传后清空表单并提示 `Upload successful for <shortId>`。
-* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<shortId>.md` 并存储 HTML。
+* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<shortId>.md` 并更新 Markdown。
 * 当前上传端点保持宽松：后端仍接受任意文件类型，依赖前端的 `.md` 限制；若后续需要可在 Flask 层再加 MIME/扩展名校验。
 
 ### 3) 获取原文（复制）

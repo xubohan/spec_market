@@ -11,8 +11,7 @@ export type SpecSummary = {
 };
 
 export type SpecDetail = SpecSummary & {
-  contentHtml?: string;
-  contentMd?: string;
+  contentMd: string;
 };
 
 export type PaginatedSpecs = {

@@ -1,11 +1,9 @@
 import { type ReactNode } from 'react';
-import DOMPurify from 'dompurify';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 type Props = {
   markdown?: string;
-  html?: string;
 };
 
 const ScrollContainer = ({ children }: { children: ReactNode }) => (
@@ -14,26 +12,20 @@ const ScrollContainer = ({ children }: { children: ReactNode }) => (
   </div>
 );
 
-export const MarkdownView = ({ markdown, html }: Props) => {
-  if (html && html.trim().length > 0) {
-    const sanitized = DOMPurify.sanitize(html);
-    return (
-      <ScrollContainer>
-        <div className="markdown-content" dangerouslySetInnerHTML={{ __html: sanitized }} />
-      </ScrollContainer>
-    );
-  }
-
+export const MarkdownView = ({ markdown }: Props) => {
   if (markdown && markdown.trim().length > 0) {
     return (
       <ScrollContainer>
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          className="markdown-content"
-          linkTarget="_blank"
-        >
-          {markdown}
-        </ReactMarkdown>
+        <div className="markdown-content">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
+            }}
+          >
+            {markdown}
+          </ReactMarkdown>
+        </div>
       </ScrollContainer>
     );
   }

@@ -1,5 +1,14 @@
 # Fix Log
 
+## Markdown-only spec detail delivery
+
+- **Date**: 2025-10-25
+- **Motivation**: 详情页未按要求渲染 Markdown，前端优先消费后端返回的 `contentHtml`，而接口还支持 `format=both` 等多种响应模式，导致接入
+  上出现 `something went wrong`。需统一以 `contentMd` 作为契约，前端直接用 React Markdown 渲染。
+- **Implementation**: 移除后端 `contentHtml` 字段及 `format` 参数分支，仅返回 Markdown；上传和更新流程停止生成 HTML。前端删掉 `html`
+  fallback，`MarkdownView` 组件专注渲染 Markdown，API hooks 也不再拼接 `format` 参数。
+- **Verification**: 运行 `pytest backend/tests` 与 `npm run build`，并通过实际页面访问确认 Markdown 可正常渲染且接口响应稳定。
+
 ## slug→shortId migration for specs
 
 - **Date**: 2025-10-21

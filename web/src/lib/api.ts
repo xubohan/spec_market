@@ -137,13 +137,11 @@ export const useTags = () =>
     queryFn: () => fetchJson<{ items: Tag[] }>('listTags'),
   });
 
-export type SpecDetailFormat = 'html' | 'md' | 'both';
-
 /** Spec detail by shortId */
-export const useSpecDetail = (shortId: string, format: SpecDetailFormat = 'html') =>
+export const useSpecDetail = (shortId: string) =>
   useQuery({
-    queryKey: ['spec', shortId, format],
-    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { shortId, format }),
+    queryKey: ['spec', shortId],
+    queryFn: () => fetchJson<SpecDetail>('getSpecDetail', { shortId }),
     enabled: Boolean(shortId),
   });
 

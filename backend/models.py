@@ -47,7 +47,6 @@ class Spec(BaseModel):
     createdAt: datetime
     updatedAt: datetime
     contentMd: str = Field(..., alias="contentMd")
-    contentHtml: Optional[str] = None
 
     class Config:
         allow_population_by_field_name = True

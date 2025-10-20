@@ -24,7 +24,7 @@ from .models import (
 )
 from .mongo import save_spec_document
 from .repository import repository
-from .utils import compute_etag, derive_short_id, generate_short_id, http_datetime, render_markdown
+from .utils import compute_etag, derive_short_id, generate_short_id, http_datetime
 
 
 cache = Cache(config={"CACHE_TYPE": settings.cache_backend})
@@ -123,12 +123,7 @@ def create_app() -> Flask:
         spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
-        format_type = request.args.get("format", "html")
         spec_dict = spec.dict(by_alias=True)
-        if format_type == "md":
-            spec_dict.pop("contentHtml", None)
-        elif format_type == "html":
-            spec_dict.pop("contentMd", None)
         etag = compute_etag(json.dumps(spec_dict, default=str).encode("utf-8"))
         last_modified = spec.updatedAt.astimezone(timezone.utc)
         if request.headers.get("If-None-Match") == etag:
@@ -237,7 +232,6 @@ def create_app() -> Flask:
         if not payload.author:
             return handle_error(BusinessErrorCode.INVALID_ARG, "author is required", 400)
         now = datetime.now(timezone.utc)
-        html = render_markdown(content_md)
         existing = existing or (repository.get_spec(payload.shortId) if payload.shortId else None)
         created_at = existing.createdAt if existing else now
         if existing:
@@ -257,7 +251,6 @@ def create_app() -> Flask:
             author=payload.author,
             createdAt=created_at,
             contentMd=content_md,
-            contentHtml=html,
             updatedAt=now,
         )
         document = spec_to_document(spec)
@@ -293,7 +286,6 @@ def create_app() -> Flask:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         now = datetime.now(timezone.utc)
         content_md = payload.contentMd
-        html = render_markdown(content_md)
         spec = Spec(
             id=existing.id,
             title=payload.title,
@@ -304,7 +296,6 @@ def create_app() -> Flask:
             author=payload.author,
             createdAt=existing.createdAt,
             contentMd=content_md,
-            contentHtml=html,
             updatedAt=now,
         )
         document = spec_to_document(spec)

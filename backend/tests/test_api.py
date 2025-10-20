@@ -53,7 +53,8 @@ def test_get_spec_detail(client):
     assert payload["status_msg"] == "success"
     data = payload["data"]
     assert data["shortId"] == "A1B2C3D4E5F6G7H8"
-    assert "contentHtml" in data
+    assert "contentMd" in data
+    assert "contentHtml" not in data
 
 
 def test_get_spec_raw(client):
@@ -197,7 +198,7 @@ def test_update_spec_endpoint(client):
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     detail = client.get(
         "/specmarket/v1/getSpecDetail",
-        query_string={"shortId": update_payload["shortId"], "format": "md"},
+        query_string={"shortId": update_payload["shortId"]},
     ).get_json()["data"]
     assert detail["summary"] == "Updated summary"
     assert detail["title"] == "Test Spec Updated"

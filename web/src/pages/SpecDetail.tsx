@@ -29,7 +29,7 @@ export const SpecDetailPage = () => {
             ))}
           </div>
         </div>
-        <MarkdownView markdown={data.contentMd} html={data.contentHtml} />
+        <MarkdownView markdown={data.contentMd} />
       </article>
       <aside className="space-y-6">
         <div className="rounded-2xl bg-card p-5 shadow-sm">

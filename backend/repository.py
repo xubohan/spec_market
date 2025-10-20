@@ -12,7 +12,7 @@ from pymongo import errors as pymongo_errors
 
 from .models import Category, PaginatedSpecs, Spec, SpecSummary, Tag
 from .mongo import list_spec_documents
-from .utils import derive_short_id, is_valid_short_id, render_markdown, slugify
+from .utils import derive_short_id, is_valid_short_id, slugify
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -81,7 +81,6 @@ class SpecRepository:
             normalized["tags"] = []
         else:
             normalized["tags"] = [str(tags_value)]
-        html = render_markdown(md)
         normalized.pop("contentHtml", None)
         normalized.pop("toc", None)
         if "createdAt" in normalized:
@@ -90,7 +89,6 @@ class SpecRepository:
             normalized["updatedAt"] = self._ensure_timezone(normalized["updatedAt"])
         return Spec(
             **normalized,
-            contentHtml=html,
         )
 
     def _merge_from_mongo(self) -> None:
