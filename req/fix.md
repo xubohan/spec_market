@@ -1,5 +1,12 @@
 # Fix Log
 
+## Disable API and UI caching for real-time updates
+
+- **Date**: 2025-10-27
+- **Motivation**: 线上页面在完成规格文档编辑后仍长时间显示旧数据，原因是后端开启了 Flask-Caching，前端又沿用 React Query 默认缓存，并允许浏览器对接口做条件缓存。必须在当前阶段彻底关闭缓存机制，确保任何改动都能即时展示。
+- **Implementation**: 后端移除 Flask-Caching 初始化、缓存装饰器与相关响应头，上传/更新后不再手动清缓存；配置项与依赖同步清理。前端将 React Query 默认 `staleTime`/`gcTime` 设为 0、强制每次挂载重新获取数据，并在所有 fetch 请求上添加 `cache: 'no-store'` 以禁用浏览器缓存。
+- **Verification**: 运行 `pytest backend/tests` 与 `npm run build` 确认后端接口和前端构建均通过，再手动更新规格并在页面刷新后立即看到最新内容，同时保留截图记录。
+
 ## Markdown-only spec detail delivery
 
 - **Date**: 2025-10-25

@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import re
 import secrets
-from datetime import datetime
 from typing import List
 
 import bleach
@@ -48,14 +47,6 @@ ALLOWED_ATTRIBUTES = {
 def render_markdown(md_text: str) -> str:
     html = markdown(md_text, extensions=["extra", "codehilite", "tables"])
     return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES)
-
-
-def compute_etag(payload: bytes) -> str:
-    return hashlib.sha256(payload).hexdigest()
-
-
-def http_datetime(dt: datetime) -> str:
-    return dt.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
 
 def _encode_base62(number: int, length: int = SHORT_ID_LENGTH) -> str:

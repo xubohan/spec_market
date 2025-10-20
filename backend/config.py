@@ -14,7 +14,6 @@ class Settings:
     mongo_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017/specdb")
     mongo_db: str = os.getenv("MONGODB_DB", "specdb")
     admin_token: str = os.getenv("ADMIN_TOKEN", "dev-admin-token")
-    cache_backend: str = os.getenv("CACHE_BACKEND", "simple")
     cors_origins: List[str] = None
     port: int = int(os.getenv("PORT", "5000"))
 

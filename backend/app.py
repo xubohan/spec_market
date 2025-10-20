@@ -8,7 +8,6 @@ from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
 from flask import Flask, Response, make_response, request, g
-from flask_caching import Cache
 from flask_cors import CORS
 from pymongo import errors as pymongo_errors
 from pydantic import ValidationError
@@ -24,16 +23,12 @@ from .models import (
 )
 from .mongo import save_spec_document
 from .repository import repository
-from .utils import compute_etag, derive_short_id, generate_short_id, http_datetime
-
-
-cache = Cache(config={"CACHE_TYPE": settings.cache_backend})
+from .utils import derive_short_id, generate_short_id
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     CORS(app, resources={r"/*": {"origins": settings.cors_origins}})
-    cache.init_app(app)
 
     logging.basicConfig(level=logging.INFO)
 
@@ -85,11 +80,7 @@ def create_app() -> Flask:
 
         return wrapper
 
-    def cache_key(*args, **kwargs):
-        return request.full_path
-
     @app.route("/specmarket/v1/listSpecs")
-    @cache.cached(timeout=60, key_prefix=cache_key)
     def list_specs():
         page = int(request.args.get("page", 1))
         page_size = min(int(request.args.get("pageSize", 10)), 50)
@@ -124,7 +115,6 @@ def create_app() -> Flask:
         return response_payload(json.loads(paginated.json()))
 
     @app.route("/specmarket/v1/getSpecDetail")
-    @cache.cached(timeout=60, key_prefix=cache_key)
     def get_spec_detail():
         short_id = request.args.get("shortId")
         if not short_id:
@@ -133,20 +123,9 @@ def create_app() -> Flask:
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
         spec_dict = spec.dict(by_alias=True)
-        etag = compute_etag(json.dumps(spec_dict, default=_json_default).encode("utf-8"))
-        last_modified = spec.updatedAt.astimezone(timezone.utc)
-        if request.headers.get("If-None-Match") == etag:
-            response = make_response("", 304)
-        elif "If-Modified-Since" in request.headers and request.headers["If-Modified-Since"] == http_datetime(last_modified):
-            response = make_response("", 304)
-        else:
-            response = response_payload(spec_dict)
-        response.headers["ETag"] = etag
-        response.headers["Last-Modified"] = http_datetime(last_modified)
-        return response
+        return response_payload(spec_dict)
 
     @app.route("/specmarket/v1/getSpecRaw")
-    @cache.cached(timeout=60, key_prefix=cache_key)
     def get_spec_raw():
         short_id = request.args.get("shortId")
         if not short_id:
@@ -154,14 +133,8 @@ def create_app() -> Flask:
         spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
-        etag = compute_etag(spec.contentMd.encode("utf-8"))
-        if request.headers.get("If-None-Match") == etag:
-            response = make_response("", 304)
-        else:
-            response = make_response(spec.contentMd, 200)
+        response = make_response(spec.contentMd, 200)
         response.headers["Content-Type"] = "text/plain; charset=utf-8"
-        response.headers["ETag"] = etag
-        response.headers["Last-Modified"] = http_datetime(spec.updatedAt.astimezone(timezone.utc))
         return response
 
     @app.route("/specmarket/v1/downloadSpec")
@@ -178,13 +151,11 @@ def create_app() -> Flask:
         return response
 
     @app.route("/specmarket/v1/listCategories")
-    @cache.cached(timeout=60, key_prefix=cache_key)
     def list_categories():
         categories = repository.list_categories()
         return response_payload({"items": json.loads(json.dumps([c.dict() for c in categories]))})
 
     @app.route("/specmarket/v1/listTags")
-    @cache.cached(timeout=60, key_prefix=cache_key)
     def list_tags():
         tags = repository.list_tags()
         return response_payload({"items": json.loads(json.dumps([t.dict() for t in tags]))})
@@ -318,7 +289,6 @@ def create_app() -> Flask:
                 "Failed to persist spec",
                 500,
             )
-        cache.clear()
         return response_payload({"shortId": spec.shortId, "updatedAt": spec.updatedAt}, 200)
 
     @app.route("/healthz")

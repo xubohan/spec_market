@@ -44,7 +44,6 @@ def override_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Gene
     repo = SpecRepository(data_path=data_path)
     monkeypatch.setattr(app_module, "repository", repo)
     monkeypatch.setattr(repository_module, "repository", repo)
-    app_module.cache.clear()
     yield
 
 

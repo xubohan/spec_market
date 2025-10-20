@@ -65,7 +65,7 @@ const extractApiData = async <T>(response: Response): Promise<T> => {
 
 /** Generic JSON fetcher that unwraps { status_code, status_msg, data } envelope */
 async function fetchJson<T>(path: string, params?: Record<string, string | number | boolean | undefined | null>): Promise<T> {
-  const response = await fetch(buildUrl(path, params), { credentials: 'include' });
+  const response = await fetch(buildUrl(path, params), { credentials: 'include', cache: 'no-store' });
   return extractApiData<T>(response);
 }
 
@@ -76,7 +76,7 @@ const HEALTHZ_PATH = '/healthz';
 export async function healthz(): Promise<Record<string, unknown>> {
   const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
   const url = new URL(HEALTHZ_PATH, base).toString();
-  const r = await fetch(url, { credentials: 'include' });
+  const r = await fetch(url, { credentials: 'include', cache: 'no-store' });
   if (!r.ok) throw new Error(`healthz failed: ${r.status}`);
   // Some servers may return empty body; normalize to {}
   try {
@@ -88,7 +88,7 @@ export async function healthz(): Promise<Record<string, unknown>> {
 
 /** GET /specmarket/v1/ping */
 export async function ping(): Promise<Record<string, unknown>> {
-  const r = await fetch(buildUrl('ping'), { credentials: 'include' });
+  const r = await fetch(buildUrl('ping'), { credentials: 'include', cache: 'no-store' });
   if (!r.ok) throw new Error(`ping failed: ${r.status}`);
   try {
     return (await r.json()) as Record<string, unknown>;
@@ -170,7 +170,10 @@ export const downloadMarkdown = (shortId: string) => {
 
 /** Copy raw markdown to clipboard */
 export const copyMarkdown = async (shortId: string) => {
-  const response = await fetch(buildUrl('getSpecRaw', { shortId }), { credentials: 'include' });
+  const response = await fetch(buildUrl('getSpecRaw', { shortId }), {
+    credentials: 'include',
+    cache: 'no-store',
+  });
   if (!response.ok) throw new Error('Failed to fetch markdown');
   const text = await response.text();
   await navigator.clipboard.writeText(text);
@@ -195,6 +198,7 @@ export const useUploadSpec = () =>
           'X-Admin-Token': payload.token,
         },
         body: payload.formData,
+        cache: 'no-store',
       });
       return extractApiData<{ id: string; shortId: string }>(response);
     },
@@ -233,6 +237,7 @@ export const useUpdateSpec = () => {
           author: payload.author,
           contentMd: payload.contentMd,
         }),
+        cache: 'no-store',
       });
       return extractApiData<{ shortId: string; updatedAt: string }>(response);
     },

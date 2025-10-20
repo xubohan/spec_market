@@ -213,7 +213,7 @@ web/
 * **数据校验**：pydantic v2（请求/响应 DTO）
 * **Markdown**：markdown-it-py + mdit-py-plugins（gfm/attrs）
 * **HTML 安全**：bleach（服务端 sanitize 一次）
-* **缓存**：Flask-Caching（Simple 或 Redis，可选）
+* **缓存**：当前阶段不启用，后续如需再评估接入方案
 * **限流**：Flask-Limiter（后期开启写接口再用）
 * **日志**：structlog 或标准 logging（JSON 格式）
 * **CORS**：Flask-CORS（仅允许前端域名）
@@ -224,7 +224,7 @@ web/
 api/
   app.py
   config.py
-  extensions/           # mongo, cache, cors, limiter, logger
+  extensions/           # mongo, cors, limiter, logger
   blueprints/
     specs/
       routes.py
