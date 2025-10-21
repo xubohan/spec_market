@@ -33,6 +33,32 @@ def _parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def _upload_spec(
+    client,
+    *,
+    title: str,
+    summary: str,
+    category: str,
+    tags: str,
+    content: str,
+    filename: str = "upload.md",
+):
+    payload = {
+        "title": title,
+        "summary": summary,
+        "category": category,
+        "tags": tags,
+        "file": (io.BytesIO(content.encode("utf-8")), filename),
+    }
+    resp = client.post(
+        "/specmarket/v1/uploadSpec",
+        data=payload,
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 201
+    return resp.get_json()["data"]["shortId"]
+
+
 def test_register_and_me(client):
     resp = _register_user(client, "alice", "VerySecure1!")
     data = resp.get_json()["data"]["user"]
@@ -329,6 +355,69 @@ def test_update_spec_endpoint(client):
         "updatedAt",
         "ownerId",
     }
+
+
+def test_list_specs_filters_by_author_username(client):
+    client.post("/specmarket/v1/auth/logout")
+    first_user = "authorone"
+    second_user = "authortwo"
+
+    _register_user(client, first_user, "Password123!")
+    first_short_id = _upload_spec(
+        client,
+        title="Author One Spec",
+        summary="Spec from author one",
+        category="alpha",
+        tags="alpha,first",
+        content="## Overview\nAuthor one body",
+        filename="author-one.md",
+    )
+
+    client.post("/specmarket/v1/auth/logout")
+    _register_user(client, second_user, "Password123!")
+    second_short_id = _upload_spec(
+        client,
+        title="Author Two Spec",
+        summary="Spec from author two",
+        category="beta",
+        tags="beta,second",
+        content="## Overview\nAuthor two body",
+        filename="author-two.md",
+    )
+
+    first_resp = client.get(
+        "/specmarket/v1/listSpecs",
+        query_string={"author": first_user},
+    )
+    assert first_resp.status_code == 200
+    first_payload = first_resp.get_json()
+    assert first_payload["status_code"] == BusinessErrorCode.SUCCESS
+    assert first_payload["data"]["total"] == 1
+    first_item = first_payload["data"]["items"][0]
+    assert first_item["author"] == f"@{first_user}"
+    assert first_item["shortId"] == first_short_id
+
+    second_resp = client.get(
+        "/specmarket/v1/listSpecs",
+        query_string={"author": second_user},
+    )
+    assert second_resp.status_code == 200
+    second_payload = second_resp.get_json()
+    assert second_payload["status_code"] == BusinessErrorCode.SUCCESS
+    assert second_payload["data"]["total"] == 1
+    second_item = second_payload["data"]["items"][0]
+    assert second_item["author"] == f"@{second_user}"
+    assert second_item["shortId"] == second_short_id
+
+    none_resp = client.get(
+        "/specmarket/v1/listSpecs",
+        query_string={"author": "unknown"},
+    )
+    assert none_resp.status_code == 200
+    none_payload = none_resp.get_json()
+    assert none_payload["status_code"] == BusinessErrorCode.SUCCESS
+    assert none_payload["data"]["total"] == 0
+    assert none_payload["data"]["items"] == []
 
 
 def test_delete_spec_endpoint(client):

@@ -192,6 +192,7 @@ def create_app() -> Flask:
         category = request.args.get("category")
         order = request.args.get("order", "-updatedAt")
         search = request.args.get("q")
+        author = request.args.get("author")
         filter_key = request.args.get("filter")
         updated_since_param = request.args.get("updatedSince")
         updated_since = None
@@ -214,6 +215,7 @@ def create_app() -> Flask:
             category=category,
             order=order,
             search=search,
+            author=author,
             updated_since=updated_since,
         )
         return response_payload(json.loads(paginated.json()))

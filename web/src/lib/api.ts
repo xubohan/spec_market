@@ -153,6 +153,7 @@ export type ListSpecParams = {
   order?: 'latest' | 'popular' | 'updated' | string;
   filter?: string;
   q?: string;
+  author?: string;
   updatedSince?: string;
 };
 

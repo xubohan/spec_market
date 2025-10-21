@@ -12,10 +12,11 @@ export const HomePage = () => {
   const page = Number(params.get('page') || '1');
   const filter = params.get('filter') || undefined;
   const search = params.get('q') || undefined;
+  const author = params.get('author') || undefined;
 
   const queryParams = useMemo(
-    () => ({ page, pageSize: 6, order: '-updatedAt', filter, q: search }),
-    [page, filter, search]
+    () => ({ page, pageSize: 6, order: '-updatedAt', filter, q: search, author }),
+    [page, filter, search, author]
   );
   const { data, isLoading } = useSpecs(queryParams);
 

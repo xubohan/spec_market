@@ -1,4 +1,18 @@
+# Sidebar visual refresh & author search support
+
+- **Date**: 2025-10-24
+- **Motivation**: 为了让首页导航与品牌区域更贴近 SaaS 市场气质，需要统一暖橙主色、优化 Logo 字体，同时补充按作者检索的需求，便于运营按发布者筛选文档。
+- **Implementation**: 左侧栏采用 Space Grotesk 品牌字型、主色点缀 `.so`，背景与高亮阴影调整为更柔和的暖白配色，并将「Management / Upload」改为「Workspace / New Spec」；搜索框根据 `@username` 自动切换作者模式并新增 `author` 查询参数以覆盖标题、标签与作者三类检索。
+- **Verification**: `npm run build` 验证前端通过构建，运行 `pytest backend/tests/test_api.py::test_list_specs_filters_by_author_username` 确认按作者过滤结果准确，手动在浏览器中执行标题、标签以及 `@username` 检索，确认高亮与查询结果展示正常，并更新截图存档。
+
 # Fix Log
+
+## Author search normalization for spec listing
+
+- **Date**: 2025-10-24
+- **Motivation**: 首页搜索栏虽可输入 `@username`，但后端缺少按作者过滤逻辑，导致查询命中后仍返回全量数据，用户无法定位某位作者的文档。
+- **Implementation**: 为 `/listSpecs` 增加 `author` 查询参数并在 `SpecRepository.list_specs` 中统一去除前缀 `@`、忽略大小写进行精确匹配；首页 `useSpecs` 请求携带作者参数，并新增 API 测试覆盖多账号上传后的检索场景。
+- **Verification**: `pytest backend/tests/test_api.py::test_list_specs_filters_by_author_username`、`npm run build`
 
 ## Unified login flow and author binding
 

@@ -116,6 +116,7 @@ class SpecRepository:
         category: str | None = None,
         order: str = "-updatedAt",
         search: str | None = None,
+        author: str | None = None,
         updated_since: datetime | None = None,
     ) -> PaginatedSpecs:
         items = list(self.specs.values())
@@ -123,6 +124,21 @@ class SpecRepository:
             items = [spec for spec in items if tag in spec.tags]
         if category:
             items = [spec for spec in items if spec.category == category]
+        if author:
+            normalized_query = author.strip().lstrip("@").lower()
+            if normalized_query:
+                filtered: List[Spec] = []
+                for spec in items:
+                    raw_author = (spec.author or "").strip()
+                    if not raw_author:
+                        continue
+                    candidates = {raw_author.lower()}
+                    stripped = raw_author.lstrip("@")
+                    if stripped:
+                        candidates.add(stripped.lower())
+                    if normalized_query in candidates:
+                        filtered.append(spec)
+                items = filtered
         if search:
             lowered = search.lower()
             items = [

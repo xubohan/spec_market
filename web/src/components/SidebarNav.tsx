@@ -14,8 +14,8 @@ const navSections = [
     ],
   },
   {
-    title: 'Management',
-    items: [{ label: 'Upload', to: '/upload' }],
+    title: 'Workspace',
+    items: [{ label: 'New Spec', to: '/upload' }],
   },
 ];
 
@@ -33,8 +33,8 @@ const NavItem = ({
       clsx(
         'group relative flex items-center rounded-xl border border-transparent px-5 py-3 text-sm font-semibold transition-all',
         isActive
-          ? 'border-primary/40 bg-primary/10 text-text shadow-sm'
-          : 'text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-text'
+          ? 'border-primary/40 bg-primary/10 text-text shadow-[0_6px_18px_rgba(227,101,73,0.15)]'
+          : 'text-muted hover:border-primary/30 hover:bg-primary/5 hover:text-text hover:shadow-[0_4px_12px_rgba(227,101,73,0.1)]'
       )
     }
     onClick={close}
@@ -44,7 +44,7 @@ const NavItem = ({
         <span
           className={clsx(
             'absolute left-2 top-1/2 h-8 w-1 -translate-y-1/2 rounded-full transition-all',
-            isActive ? 'bg-primary opacity-100' : 'bg-primary/40 opacity-0 group-hover:opacity-60'
+            isActive ? 'bg-primary opacity-100 shadow-[0_0_6px_rgba(227,101,73,0.5)]' : 'bg-primary/40 opacity-0 group-hover:opacity-60'
           )}
           aria-hidden
         />
@@ -82,12 +82,18 @@ export const SidebarNav = () => {
       >
         <Menu className="h-5 w-5" />
       </button>
-      <aside className="fixed hidden h-full w-64 flex-col justify-between bg-[#F2ECE6] px-6 py-8 shadow-[inset_-1px_0_0_rgba(0,0,0,0.05)] lg:flex">
+      <aside className="fixed hidden h-full w-64 flex-col justify-between bg-[#FBFAF8] px-6 py-8 shadow-[inset_-1px_0_0_rgba(0,0,0,0.05)] lg:flex">
         <div className="space-y-6">
-          <div className="text-2xl font-bold tracking-tight text-text">Spec.so</div>
+          <div
+            className="text-2xl font-semibold tracking-tight text-text"
+            style={{ fontFamily: "'Space Grotesk', 'Inter', 'Noto Sans SC', system-ui, sans-serif", letterSpacing: '-0.01em' }}
+          >
+            <span className="text-text">Spec</span>
+            <span className="text-primary">.so</span>
+          </div>
           <NavContent />
         </div>
-        <div className="text-sm text-muted/80">Settings (coming soon)</div>
+        <div className="text-sm font-medium text-muted/60">Settings (coming soon)</div>
       </aside>
       <Transition show={open} as={Fragment}>
         <Dialog onClose={() => setOpen(false)} className="relative z-50 lg:hidden">
