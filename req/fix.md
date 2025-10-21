@@ -1,6 +1,6 @@
 # Sidebar visual refresh & author search support
 
-- **Date**: 2025-10-24
+- **Date**: 2025-10-21
 - **Motivation**: 为了让首页导航与品牌区域更贴近 SaaS 市场气质，需要统一暖橙主色、优化 Logo 字体，同时补充按作者检索的需求，便于运营按发布者筛选文档。
 - **Implementation**: 左侧栏采用 Space Grotesk 品牌字型、主色点缀 `.so`，背景与高亮阴影调整为更柔和的暖白配色，并将「Management / Upload」改为「Workspace / New Spec」；搜索框根据 `@username` 自动切换作者模式并新增 `author` 查询参数以覆盖标题、标签与作者三类检索。
 - **Verification**: `npm run build` 验证前端通过构建，运行 `pytest backend/tests/test_api.py::test_list_specs_filters_by_author_username` 确认按作者过滤结果准确，手动在浏览器中执行标题、标签以及 `@username` 检索，确认高亮与查询结果展示正常，并更新截图存档。
@@ -9,28 +9,28 @@
 
 ## Author search normalization for spec listing
 
-- **Date**: 2025-10-24
+- **Date**: 2025-10-21
 - **Motivation**: 首页搜索栏虽可输入 `@username`，但后端缺少按作者过滤逻辑，导致查询命中后仍返回全量数据，用户无法定位某位作者的文档。
 - **Implementation**: 为 `/listSpecs` 增加 `author` 查询参数并在 `SpecRepository.list_specs` 中统一去除前缀 `@`、忽略大小写进行精确匹配；首页 `useSpecs` 请求携带作者参数，并新增 API 测试覆盖多账号上传后的检索场景。
 - **Verification**: `pytest backend/tests/test_api.py::test_list_specs_filters_by_author_username`、`npm run build`
 
 ## Unified login flow and author binding
 
-- **Date**: 2025-10-23
+- **Date**: 2025-10-21
 - **Motivation**: 登录入口分散在 Upload/Edit/详情页内的卡片中，体验割裂，且作者信息依赖表单输入，无法保证与账号绑定，也无法限制非作者的写权限。
 - **Implementation**: 在右上角新增全局 Top Bar 管理登录态，新增独立登录页并在 Upload/Edit 访问前自动跳转；后端将上传/更新/删除操作与 `ownerId` 绑定，只允许作者执行，同时自动生成 `@username` 作者字段并写入文档。前端移除 Author 输入框，写操作页改为基于登录状态重定向和禁用逻辑。
 - **Verification**: 运行 `pytest` 覆盖新的权限判定与自动归属逻辑，并执行 `npm run build` 验证前端编译及登录跳转；手动登录后上传/编辑/删除文档，确认作者字段自动补全且仅作者可操作，同时更新页面截图。
 
 ## Session-based auth rollout
 
-- **Date**: 2025-10-22
+- **Date**: 2025-10-21
 - **Motivation**: 现网依赖固定的 admin token 操作上传/编辑/删除接口，不具备账号体系，容易被误用，也无法追踪操作者。
 - **Implementation**: 引入会话 Cookie 驱动的注册/登录/登出接口，后端基于 bcrypt 哈希保存密码并新增 `require_login` 装饰器保护写操作；前端提供 `AuthProvider` 和 `AuthCard` 组件以在 Upload/Edit/详情页中切换登录态，所有写请求自动携带凭据。
 - **Verification**: 运行 `pytest` 覆盖注册、登录、登出和认证写操作的端到端流程，并在前端登录后上传/编辑/删除确保成功；更新截图存档。
 
 ## Spec detail layout iteration
 
-- **Date**: 2025-10-22
+- **Date**: 2025-10-21
 - **Motivation**: 详情页仍然存在三层卡片的压迫感，操作按钮主次不清、Meta 卡片内的 shortId 溢出，影响浏览体验。
 - **Implementation**: 调整全局布局移除额外的内容外壳，让详情页仅保留标题区与 Markdown 内容两层视觉层级；将复制、下载、编辑、删除整合成统一的图标按钮组，弱化删除按钮并保留提示；Meta 信息卡片改为双列排布、支持 `break-all`，避免短链溢出。
 - **Verification**: 运行 `npm run build`，本地打开 Spec 详情页确认层级与操作按钮展示正常，并更新截图。
