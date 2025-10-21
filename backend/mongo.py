@@ -16,6 +16,7 @@ from .config import settings
 
 _client: MongoClient | None = None
 _collection: Collection | "_InMemorySpecCollection" | None = None
+_history_collection: Collection | "_InMemorySpecHistoryCollection" | None = None
 _user_collection: Collection | "_InMemoryUserCollection" | None = None
 
 
@@ -40,6 +41,41 @@ class _InMemorySpecCollection:
         short_id = filter.get("shortId")
         if short_id is None:
             raise ValueError("shortId filter is required for in-memory fallback")
+        self.store.pop(short_id, None)
+
+
+class _InMemorySpecHistoryCollection:
+    def __init__(self) -> None:
+        self.store: Dict[str, Dict[int, Dict[str, Any]]] = {}
+
+    def update_one(self, filter: Dict[str, Any], update: Dict[str, Any], upsert: bool = False) -> None:
+        short_id = filter.get("shortId")
+        version = filter.get("version")
+        if short_id is None or version is None:
+            raise ValueError("shortId and version filters are required for history fallback")
+        if "$set" not in update:
+            raise ValueError("$set update is required for history fallback")
+        versions = self.store.setdefault(short_id, {})
+        versions[int(version)] = dict(update["$set"])
+
+    def find(self, filter: Dict[str, Any] | None = None) -> Iterable[Dict[str, Any]]:
+        if not filter or "shortId" not in filter:
+            return [dict(doc) for versions in self.store.values() for doc in versions.values()]
+        versions = self.store.get(filter["shortId"], {})
+        return [dict(doc) for doc in versions.values()]
+
+    def find_one(self, filter: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        short_id = filter.get("shortId")
+        version = filter.get("version")
+        if short_id is None or version is None:
+            return None
+        doc = self.store.get(short_id, {}).get(int(version))
+        return dict(doc) if doc else None
+
+    def delete_many(self, filter: Dict[str, Any]) -> None:
+        short_id = filter.get("shortId")
+        if short_id is None:
+            return
         self.store.pop(short_id, None)
 
 
@@ -110,14 +146,15 @@ def _normalize_user_document(document: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _init_client() -> None:
-    global _client, _collection, _user_collection
-    if _collection is not None and _user_collection is not None:
+    global _client, _collection, _history_collection, _user_collection
+    if _collection is not None and _user_collection is not None and _history_collection is not None:
         return
     try:
         _client = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=2000)
         _client.admin.command("ping")
         db = _client[settings.mongo_db]
         _collection = db["specs"]
+        _history_collection = db["spec_versions"]
         _user_collection = db["users"]
         try:
             _user_collection.create_index("username", unique=True)
@@ -127,6 +164,7 @@ def _init_client() -> None:
         logging.warning("MongoDB unavailable, using in-memory fallback: %s", exc)
         _client = None
         _collection = _InMemorySpecCollection()
+        _history_collection = _InMemorySpecHistoryCollection()
         _user_collection = _InMemoryUserCollection()
 
 
@@ -147,6 +185,21 @@ def save_spec_document(document: Dict[str, Any]) -> None:
     collection.update_one({"shortId": document["shortId"]}, {"$set": document}, upsert=True)
 
 
+def get_history_collection() -> Collection | _InMemorySpecHistoryCollection:
+    if _history_collection is None:
+        _init_client()
+    return _history_collection  # type: ignore[return-value]
+
+
+def save_spec_version_document(document: Dict[str, Any]) -> None:
+    history = get_history_collection()
+    history.update_one(
+        {"shortId": document["shortId"], "version": document["version"]},
+        {"$set": document},
+        upsert=True,
+    )
+
+
 def list_spec_documents() -> List[Dict[str, Any]]:
     collection = get_spec_collection()
     try:
@@ -157,12 +210,55 @@ def list_spec_documents() -> List[Dict[str, Any]]:
     return [dict(doc) for doc in cursor]
 
 
+def list_spec_version_documents(short_id: str) -> List[Dict[str, Any]]:
+    history = get_history_collection()
+    try:
+        cursor = history.find({"shortId": short_id})  # type: ignore[attr-defined]
+    except AttributeError:
+        logging.warning("History collection does not support find(); returning empty list")
+        return []
+    return [dict(doc) for doc in cursor]
+
+
+def find_latest_spec_version_document(short_id: str) -> Optional[Dict[str, Any]]:
+    history = get_history_collection()
+    try:
+        cursor = history.find({"shortId": short_id}).sort("version", -1).limit(1)  # type: ignore[attr-defined]
+        for doc in cursor:
+            return dict(doc)
+        return None
+    except AttributeError:
+        documents = list_spec_version_documents(short_id)
+        if not documents:
+            return None
+        documents.sort(key=lambda doc: int(doc.get("version", 0)), reverse=True)
+        return dict(documents[0])
+
+
+def find_spec_version_document(short_id: str, version: int) -> Optional[Dict[str, Any]]:
+    history = get_history_collection()
+    try:
+        document = history.find_one({"shortId": short_id, "version": version})  # type: ignore[attr-defined]
+    except AttributeError:
+        logging.warning("History collection does not support find_one(); returning None")
+        return None
+    return dict(document) if document else None
+
+
 def delete_spec_document(short_id: str) -> None:
     collection = get_spec_collection()
     try:
         collection.delete_one({"shortId": short_id})  # type: ignore[attr-defined]
     except AttributeError:
         logging.warning("Mongo collection does not support delete_one(); skipping delete")
+
+
+def delete_spec_versions(short_id: str) -> None:
+    history = get_history_collection()
+    try:
+        history.delete_many({"shortId": short_id})  # type: ignore[attr-defined]
+    except AttributeError:
+        logging.warning("History collection does not support delete_many(); skipping delete")
 
 
 def create_user_document(username: str, password_hash: str) -> Dict[str, Any]:

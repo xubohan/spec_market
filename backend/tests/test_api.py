@@ -119,20 +119,22 @@ def test_list_specs_filter_today_handles_naive_documents(client):
     from backend import repository as repository_module
 
     repo = repository_module.repository
-    repo.refresh_from_document(
-        {
-            "id": "spec-2",
-            "title": "Naive datetime spec",
-            "shortId": "B7C8D9E0F1G2H3I4",
-            "summary": "Summary",
-            "category": "test",
-            "tags": ["tag"],
-            "contentMd": "## Overview\nNaive content",
-            "author": "Demo Author",
-            "createdAt": datetime.now(timezone.utc).replace(tzinfo=None),
-            "updatedAt": datetime.now(timezone.utc).replace(tzinfo=None),
-        }
-    )
+    naive_created = datetime.now(timezone.utc).replace(tzinfo=None)
+    naive_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+    metadata_doc = {
+        "id": "spec-2",
+        "title": "Naive datetime spec",
+        "shortId": "B7C8D9E0F1G2H3I4",
+        "summary": "Summary",
+        "category": "test",
+        "tags": ["tag"],
+        "author": "Demo Author",
+        "createdAt": naive_created,
+        "updatedAt": naive_updated,
+        "version": 1,
+    }
+    version_doc = {**metadata_doc, "contentMd": "## Overview\nNaive content"}
+    repo.refresh_from_document(metadata_doc, version_doc)
 
     resp = client.get("/specmarket/v1/listSpecs", query_string={"filter": "today"})
     assert resp.status_code == 200
@@ -141,6 +143,7 @@ def test_list_specs_filter_today_handles_naive_documents(client):
     assert body["data"]["total"] == 1
     assert body["data"]["items"][0]["shortId"] == "B7C8D9E0F1G2H3I4"
     repo.specs.pop("B7C8D9E0F1G2H3I4", None)
+    repo.metadata.pop("B7C8D9E0F1G2H3I4", None)
 
 
 def test_get_spec_detail(client):
@@ -153,6 +156,13 @@ def test_get_spec_detail(client):
     assert data["shortId"] == "A1B2C3D4E5F6G7H8"
     assert "contentMd" in data
     assert "contentHtml" not in data
+    assert data["version"] == 1
+    assert data["isLatest"] is True
+    history = data["history"]
+    assert history["latestVersion"] == 1
+    assert history["total"] == 1
+    assert len(history["items"]) == 1
+    assert history["items"][0]["version"] == 1
 
 
 def test_get_spec_raw(client):
@@ -198,6 +208,7 @@ def test_upload_spec(client):
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     assert body["status_msg"] == "success"
     returned_short_id = body["data"]["shortId"]
+    assert body["data"]["version"] == 1
     assert len(returned_short_id) == 16
     list_resp = client.get("/specmarket/v1/listSpecs", query_string={"_": returned_short_id})
     assert list_resp.get_json()["data"]["total"] == 2
@@ -206,20 +217,27 @@ def test_upload_spec(client):
     assert isinstance(collection, mongo_module._InMemoryCollection)
     stored = collection.store[returned_short_id]
     expected_keys = {
+        "id",
         "shortId",
         "title",
         "summary",
         "category",
         "tags",
         "author",
-        "contentMd",
         "createdAt",
         "updatedAt",
         "ownerId",
+        "version",
     }
     assert set(stored.keys()) == expected_keys
     assert stored["author"] == "@tester"
     assert stored["ownerId"] == user_id
+    assert stored["version"] == 1
+
+    history_collection = mongo_module._history_collection
+    assert isinstance(history_collection, mongo_module._InMemorySpecHistoryCollection)
+    history_doc = history_collection.store[returned_short_id][1]
+    assert history_doc["contentMd"].strip().endswith("Uploaded spec")
 
 
 def test_upload_spec_preserves_short_id_on_update(client):
@@ -251,10 +269,17 @@ def test_upload_spec_preserves_short_id_on_update(client):
         content_type="multipart/form-data",
     )
     assert update_resp.status_code == 201
+    assert update_resp.get_json()["data"]["version"] == 2
     detail_resp = client.get("/specmarket/v1/getSpecDetail", query_string={"shortId": short_id})
     detail_data = detail_resp.get_json()["data"]
     assert detail_data["summary"] == "Updated summary"
     assert detail_data["author"] == "@tester"
+    assert detail_data["version"] == 2
+    history = detail_data["history"]
+    assert history["total"] == 2
+    versions = [item["version"] for item in history["items"]]
+    assert versions[0] == 2
+    assert 1 in versions
     list_resp = client.get(
         "/specmarket/v1/listSpecs",
         query_string={"_": f"update-{short_id}"},
@@ -264,6 +289,43 @@ def test_upload_spec_preserves_short_id_on_update(client):
     assert sum(1 for item in body["data"]["items"] if item["shortId"] == short_id) == 1
 
 
+def test_get_spec_version_endpoint(client):
+    _register_user(client)
+    original_md = "## Overview\nOriginal body"
+    short_id = _upload_spec(
+        client,
+        title="Versioned Spec",
+        summary="Initial",
+        category="history",
+        tags="hist,example",
+        content=original_md,
+        filename="history.md",
+    )
+    update_payload = {
+        "shortId": short_id,
+        "title": "Versioned Spec",
+        "summary": "Second",
+        "category": "history",
+        "tags": ["hist", "example"],
+        "contentMd": "## Overview\nSecond body",
+    }
+    resp = client.put("/specmarket/v1/updateSpec", json=update_payload)
+    assert resp.status_code == 200
+
+    version_resp = client.get(
+        "/specmarket/v1/getSpecVersion",
+        query_string={"shortId": short_id, "version": 1},
+    )
+    assert version_resp.status_code == 200
+    payload = version_resp.get_json()
+    assert payload["status_code"] == BusinessErrorCode.SUCCESS
+    data = payload["data"]
+    assert data["version"] == 1
+    assert data["isLatest"] is False
+    assert data["history"]["latestVersion"] == 2
+    assert data["history"]["total"] == 2
+    assert any(item["version"] == 1 for item in data["history"]["items"])
+    assert data["contentMd"].strip().endswith("Original body")
 def test_error_response_contains_trace_and_code(client):
     resp = client.get("/specmarket/v1/getSpecDetail")
     assert resp.status_code == 400
@@ -321,6 +383,7 @@ def test_update_spec_endpoint(client):
     body = resp.get_json()
     assert body["status_code"] == BusinessErrorCode.SUCCESS
     response_updated_at = body["data"]["updatedAt"]
+    assert body["data"]["version"] == 2
     assert "T" in response_updated_at
     assert response_updated_at.endswith("Z")
     assert response_updated_at != original_updated_at
@@ -335,26 +398,38 @@ def test_update_spec_endpoint(client):
     assert detail["contentMd"].strip().endswith("Updated test content")
     assert "T" in detail["updatedAt"]
     assert detail["updatedAt"] == response_updated_at
+    assert detail["version"] == 2
+    assert detail["isLatest"] is True
+    history_data = detail["history"]
+    assert history_data["total"] == 2
+    history_versions = [item["version"] for item in history_data["items"]]
+    assert history_versions[0] == 2
+    assert 1 in history_versions
 
     collection = mongo_module._collection
     assert isinstance(collection, mongo_module._InMemoryCollection)
     stored = collection.store[update_payload["shortId"]]
     assert stored["summary"] == "Updated summary"
-    assert stored["contentMd"].strip().endswith("Updated test content")
     assert stored["author"] == "@tester"
     assert stored["ownerId"] == user_id
     assert set(stored.keys()) == {
+        "id",
         "shortId",
         "title",
         "summary",
         "category",
         "tags",
         "author",
-        "contentMd",
         "createdAt",
         "updatedAt",
         "ownerId",
+        "version",
     }
+
+    history_collection = mongo_module._history_collection
+    assert isinstance(history_collection, mongo_module._InMemorySpecHistoryCollection)
+    history_docs = history_collection.store[update_payload["shortId"]]
+    assert history_docs[2]["contentMd"].strip().endswith("Updated test content")
 
 
 def test_list_specs_filters_by_author_username(client):
@@ -466,3 +541,6 @@ def test_delete_spec_endpoint(client):
     collection = mongo_module._collection
     assert isinstance(collection, mongo_module._InMemoryCollection)
     assert short_id not in collection.store
+    history_collection = mongo_module._history_collection
+    assert isinstance(history_collection, mongo_module._InMemorySpecHistoryCollection)
+    assert short_id not in history_collection.store

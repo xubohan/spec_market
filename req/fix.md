@@ -7,6 +7,13 @@
 
 # Fix Log
 
+## Version history tracking for specs
+
+- **Date**: 2025-10-22
+- **Motivation**: 现有平台仅保留最新文档，无法追溯历史修改，作者也难以验证前后差异，需要引入版本管理和可视化历史入口。
+- **Implementation**: 后端将 `specs` 主表精简为仅存储结构化元数据（标题、分类、标签、作者、ownerId 等），Markdown 正文与版本号全部写入 `spec_versions`，详情与版本接口按 `shortId` 合并最新内容并返回完整历史列表与 `total` 计数。前端保留标题区的版本徽章，Meta 卡片移除版本行，历史卡片默认展示最多 3 个旧版本并提供“View full history”切换，支持在同一 UI 中浏览包含最新在内的所有版本，Short ID 仍可一键复制。
+- **Verification**: 运行 `pytest` 与 `npm run build`，手动在详情页切换多轮历史版本与“View full history”折叠，确认 Markdown、版本号与历史计数同步更新，并补充截图存档。
+
 ## Author search normalization for spec listing
 
 - **Date**: 2025-10-21

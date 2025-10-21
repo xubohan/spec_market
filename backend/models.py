@@ -47,6 +47,7 @@ class Spec(BaseModel):
     ownerId: Optional[str] = None
     createdAt: datetime
     updatedAt: datetime
+    version: int = Field(default=1, ge=1)
     contentMd: str = Field(..., alias="contentMd")
 
     class Config:
@@ -70,6 +71,7 @@ class SpecSummary(BaseModel):
     ownerId: Optional[str] = None
     createdAt: datetime
     updatedAt: datetime
+    version: int = Field(default=1, ge=1)
 
     @validator("shortId")
     def validate_short_id(cls, value: str) -> str:
@@ -99,6 +101,66 @@ class Category(BaseModel):
 
 class Tag(Category):
     pass
+
+
+class SpecHistoryItem(BaseModel):
+    shortId: str
+    version: int = Field(..., ge=1)
+    title: str
+    summary: str
+    author: str
+    updatedAt: datetime
+
+    @validator("shortId")
+    def validate_short_id(cls, value: str) -> str:
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError(SHORT_ID_ERROR)
+        return value
+
+
+class SpecMetadata(BaseModel):
+    id: str
+    title: str
+    shortId: str
+    summary: str
+    category: str
+    tags: List[str]
+    author: str
+    ownerId: Optional[str] = None
+    createdAt: datetime
+    updatedAt: datetime
+    version: int = Field(default=1, ge=1)
+
+    @validator("shortId")
+    def validate_short_id(cls, value: str) -> str:
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError(SHORT_ID_ERROR)
+        return value
+
+
+class SpecVersion(BaseModel):
+    shortId: str
+    version: int = Field(..., ge=1)
+    title: str
+    summary: str
+    category: str
+    tags: List[str]
+    author: str
+    contentMd: str
+    createdAt: datetime
+    updatedAt: datetime
+
+    @validator("shortId")
+    def validate_short_id(cls, value: str) -> str:
+        if not SHORT_ID_REGEX.fullmatch(value):
+            raise ValueError(SHORT_ID_ERROR)
+        return value
+
+    @validator("contentMd")
+    def validate_content(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("contentMd must not be empty")
+        return value
 
 
 class UploadPayload(BaseModel):
@@ -165,22 +227,52 @@ class APIResponse(BaseModel):
         )
 
 
-def spec_to_document(spec: Spec) -> Dict[str, Any]:
-    """Serialize a Spec for Mongo persistence."""
+def spec_metadata_to_document(spec: Spec | SpecMetadata) -> Dict[str, Any]:
+    """Serialize metadata fields for persistence in the primary specs collection."""
+
+    if isinstance(spec, Spec):
+        source = spec.dict(exclude={"contentMd"}, by_alias=True)
+    else:
+        source = spec.dict(by_alias=True)
 
     document = {
-        "shortId": spec.shortId,
-        "title": spec.title,
-        "summary": spec.summary,
-        "category": spec.category,
-        "tags": list(spec.tags),
-        "author": spec.author,
-        "contentMd": spec.contentMd,
-        "createdAt": spec.createdAt,
-        "updatedAt": spec.updatedAt,
+        "id": source.get("id") or f"spec-{source['shortId']}",
+        "shortId": source["shortId"],
+        "title": source["title"],
+        "summary": source["summary"],
+        "category": source["category"],
+        "tags": list(source["tags"]),
+        "author": source["author"],
+        "createdAt": source["createdAt"],
+        "updatedAt": source["updatedAt"],
+        "version": source["version"],
     }
-    if spec.ownerId:
-        document["ownerId"] = spec.ownerId
+    owner_id = source.get("ownerId")
+    if owner_id:
+        document["ownerId"] = owner_id
+    return document
+
+
+def spec_version_to_document(spec: Spec | SpecVersion) -> Dict[str, Any]:
+    """Serialize complete version data for persistence in the history collection."""
+
+    if isinstance(spec, Spec):
+        source = spec.dict(by_alias=True)
+    else:
+        source = spec.dict(by_alias=True)
+
+    document = {
+        "shortId": source["shortId"],
+        "version": source["version"],
+        "title": source["title"],
+        "summary": source["summary"],
+        "category": source["category"],
+        "tags": list(source["tags"]),
+        "author": source["author"],
+        "contentMd": source["contentMd"],
+        "createdAt": source["createdAt"],
+        "updatedAt": source["updatedAt"],
+    }
     return document
 
 

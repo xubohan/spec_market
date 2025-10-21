@@ -22,14 +22,17 @@ from .models import (
     UpdatePayload,
     User,
     UserCredentials,
-    spec_to_document,
+    spec_metadata_to_document,
+    spec_version_to_document,
 )
 from .mongo import (
     create_user_document,
     delete_spec_document,
+    delete_spec_versions,
     find_user_document_by_id,
     find_user_document_by_username,
     save_spec_document,
+    save_spec_version_document,
     update_user_timestamp,
 )
 from .repository import repository
@@ -123,6 +126,19 @@ def create_app() -> Flask:
             return spec.ownerId == user.id
         normalized_author = (spec.author or "").lstrip("@")
         return normalized_author == user.username
+
+    def serialize_spec(spec: Spec, *, latest: Spec | None = None) -> Dict[str, Any]:
+        latest_spec = latest or repository.get_spec(spec.shortId)
+        history_items = repository.get_spec_history(spec.shortId)
+        payload = spec.dict(by_alias=True)
+        latest_version = latest_spec.version if latest_spec else spec.version
+        payload["isLatest"] = latest_spec is None or spec.version == latest_version
+        payload["history"] = {
+            "latestVersion": latest_version,
+            "items": [item.dict() for item in history_items],
+            "total": len(history_items),
+        }
+        return payload
 
     @app.route("/specmarket/v1/auth/register", methods=["POST"])
     def register_user():
@@ -228,8 +244,29 @@ def create_app() -> Flask:
         spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
-        spec_dict = spec.dict(by_alias=True)
-        return response_payload(spec_dict)
+        return response_payload(serialize_spec(spec, latest=spec))
+
+    @app.route("/specmarket/v1/getSpecVersion")
+    def get_spec_version():
+        short_id = request.args.get("shortId")
+        version_param = request.args.get("version")
+        if not short_id:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "shortId is required", 400)
+        if not version_param:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "version is required", 400)
+        try:
+            version = int(version_param)
+        except (TypeError, ValueError):
+            return handle_error(BusinessErrorCode.INVALID_ARG, "version must be an integer", 400)
+        if version < 1:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "version must be >= 1", 400)
+        latest = repository.get_spec(short_id)
+        if not latest:
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
+        spec = repository.get_spec_version(short_id, version)
+        if not spec:
+            return handle_error(BusinessErrorCode.NOT_FOUND, "Spec version not found", 404)
+        return response_payload(serialize_spec(spec, latest=latest))
 
     @app.route("/specmarket/v1/deleteSpec", methods=["DELETE"])
     @require_login
@@ -260,6 +297,7 @@ def create_app() -> Flask:
 
         try:
             delete_spec_document(short_id)
+            delete_spec_versions(short_id)
         except pymongo_errors.PyMongoError as exc:
             logging.warning("Failed to delete spec from MongoDB: %s", exc)
 
@@ -368,6 +406,7 @@ def create_app() -> Flask:
         spec_id = existing.id if existing else f"spec-{short_id}"
         owner_id = existing.ownerId if existing and existing.ownerId else user.id
         author = f"@{user.username}"
+        version = existing.version + 1 if existing else 1
         spec = Spec(
             id=spec_id,
             title=payload.title,
@@ -380,11 +419,14 @@ def create_app() -> Flask:
             contentMd=content_md,
             updatedAt=now,
             ownerId=owner_id,
+            version=version,
         )
-        document = spec_to_document(spec)
+        metadata_document = spec_metadata_to_document(spec)
+        version_document = spec_version_to_document(spec)
         try:
-            save_spec_document(document)
-            repository.refresh_from_document(document)
+            save_spec_document(metadata_document)
+            save_spec_version_document(version_document)
+            repository.refresh_from_document(metadata_document, version_document)
         except pymongo_errors.PyMongoError as exc:
             logging.exception("Failed to persist spec to MongoDB: %s", exc)
             return handle_error(
@@ -392,7 +434,7 @@ def create_app() -> Flask:
                 "Failed to persist spec",
                 500,
             )
-        return response_payload({"id": spec.id, "shortId": spec.shortId}, 201)
+        return response_payload({"id": spec.id, "shortId": spec.shortId, "version": spec.version}, 201)
 
     @app.route("/specmarket/v1/updateSpec", methods=["PUT"])
     @require_login
@@ -423,6 +465,7 @@ def create_app() -> Flask:
             )
         now = datetime.now(timezone.utc)
         content_md = payload.contentMd
+        version = existing.version + 1
         spec = Spec(
             id=existing.id,
             title=payload.title,
@@ -435,11 +478,14 @@ def create_app() -> Flask:
             contentMd=content_md,
             updatedAt=now,
             ownerId=existing.ownerId or user.id,
+            version=version,
         )
-        document = spec_to_document(spec)
+        metadata_document = spec_metadata_to_document(spec)
+        version_document = spec_version_to_document(spec)
         try:
-            save_spec_document(document)
-            repository.refresh_from_document(document)
+            save_spec_document(metadata_document)
+            save_spec_version_document(version_document)
+            repository.refresh_from_document(metadata_document, version_document)
         except pymongo_errors.PyMongoError as exc:
             logging.exception("Failed to persist spec update to MongoDB: %s", exc)
             return handle_error(
@@ -447,7 +493,10 @@ def create_app() -> Flask:
                 "Failed to persist spec",
                 500,
             )
-        return response_payload({"shortId": spec.shortId, "updatedAt": spec.updatedAt}, 200)
+        return response_payload(
+            {"shortId": spec.shortId, "updatedAt": spec.updatedAt, "version": spec.version},
+            200,
+        )
 
     @app.route("/healthz")
     def healthz():

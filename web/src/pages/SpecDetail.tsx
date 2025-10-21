@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ApiRequestError, useDeleteSpec, useSpecDetail } from '../lib/api';
+import { ApiRequestError, useDeleteSpec, useSpecDetail, useSpecVersion } from '../lib/api';
 import { MarkdownView } from '../components/MarkdownView';
 import { CopyMarkdownButton } from '../components/CopyMarkdownButton';
 import { DownloadButton } from '../components/DownloadButton';
 import { useAuth } from '../lib/auth';
-import { Calendar, Clock3, Edit3, Folder, Hash, Tag, Trash2, User } from 'lucide-react';
+import { Calendar, Clock3, Copy, Edit3, Folder, Hash, History, Tag, Trash2, User } from 'lucide-react';
 
 export const SpecDetailPage = () => {
   const { shortId = '' } = useParams();
@@ -15,23 +15,59 @@ export const SpecDetailPage = () => {
   const { user } = useAuth();
   const deleteMutation = useDeleteSpec();
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [activeVersion, setActiveVersion] = useState<number | null>(null);
+  const [isHistoryExpanded, setHistoryExpanded] = useState(false);
   const redirectTarget = useMemo(
     () => `${location.pathname}${location.search}`,
     [location.pathname, location.search],
   );
+  useEffect(() => {
+    setActiveVersion(null);
+    setHistoryExpanded(false);
+  }, [shortId]);
+
+  const targetVersion = useMemo(() => {
+    if (!data || activeVersion === null) {
+      return null;
+    }
+    if (activeVersion === data.version) {
+      return null;
+    }
+    return activeVersion;
+  }, [activeVersion, data]);
+
+  const { data: versionData, isLoading: isVersionLoading } = useSpecVersion(shortId, targetVersion);
+  const spec = versionData ?? data;
+  const history = spec?.history ?? data?.history;
+  const historyItems = history?.items ?? [];
+  const latestVersion = history?.latestVersion ?? spec?.version ?? null;
+  const previewHistoryItems = useMemo(() => {
+    if (!historyItems.length) {
+      return [];
+    }
+    if (historyItems.length === 1 || latestVersion === null) {
+      return historyItems;
+    }
+    return historyItems.filter((item) => item.version !== latestVersion).slice(0, 3);
+  }, [historyItems, latestVersion]);
+  const hasAdditionalHistory = historyItems.length > previewHistoryItems.length;
+  const visibleHistoryItems = isHistoryExpanded ? historyItems : previewHistoryItems;
+  const totalHistoryCount = history?.total ?? historyItems.length;
   const normalizedAuthor = useMemo(
-    () => (data?.author ?? '').replace(/^@/, ''),
-    [data?.author],
+    () => (spec?.author ?? '').replace(/^@/, ''),
+    [spec?.author],
   );
   const isOwner = useMemo(() => {
-    if (!user || !data) {
+    if (!user || !spec) {
       return false;
     }
-    if (data.ownerId) {
-      return data.ownerId === user.id;
+    if (spec.ownerId) {
+      return spec.ownerId === user.id;
     }
     return normalizedAuthor === user.username;
-  }, [user, data, normalizedAuthor]);
+  }, [user, spec, normalizedAuthor]);
+  const isViewingHistory = Boolean(versionData && data && spec && spec.version !== data.version);
+  const isVersionLoadingState = Boolean(targetVersion && isVersionLoading);
 
   if (isLoading) {
     return <p className="text-muted">Loading...</p>;
@@ -42,7 +78,7 @@ export const SpecDetailPage = () => {
   }
 
   const handleDelete = async () => {
-    if (!data) {
+    if (!spec) {
       return;
     }
     if (!user) {
@@ -59,7 +95,7 @@ export const SpecDetailPage = () => {
     }
     setMessage(null);
     try {
-      await deleteMutation.mutateAsync({ shortId: data.shortId });
+      await deleteMutation.mutateAsync({ shortId: spec.shortId });
       navigate('/', { replace: true });
     } catch (error) {
       if (error instanceof ApiRequestError) {
@@ -70,9 +106,13 @@ export const SpecDetailPage = () => {
     }
   };
 
-  const formattedUpdatedAt = new Date(data.updatedAt).toLocaleString();
-  const formattedCreatedAt = new Date(data.createdAt).toLocaleString();
-  const editPath = `/specs/${data.shortId}/edit`;
+  if (!spec) {
+    return <p className="text-muted">Spec not found.</p>;
+  }
+
+  const formattedUpdatedAt = new Date(spec.updatedAt).toLocaleString();
+  const formattedCreatedAt = new Date(spec.createdAt).toLocaleString();
+  const editPath = `/specs/${spec.shortId}/edit`;
   const canEdit = !!user && isOwner;
   const canDelete = !!user && isOwner;
   const editTitle = !user ? 'Sign in to edit' : canEdit ? 'Edit Spec' : 'Only the author can edit';
@@ -83,15 +123,48 @@ export const SpecDetailPage = () => {
     : canDelete
     ? 'Delete Spec'
     : 'Only the author can delete';
+  const handleCopyShortId = async () => {
+    if (!spec) {
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(spec.shortId);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = spec.shortId;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setMessage({ type: 'success', text: 'Short ID copied to clipboard.' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to copy short ID.' });
+    }
+  };
+  const handleSelectVersion = (version: number) => {
+    if (latestVersion !== null && version === latestVersion) {
+      setActiveVersion(null);
+      return;
+    }
+    setActiveVersion(version);
+  };
+  const handleViewLatest = () => {
+    setActiveVersion(null);
+  };
+  const activeHistoryVersion = isViewingHistory ? spec.version : activeVersion;
 
   return (
     <section className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
       <article className="space-y-6">
         <header className="rounded-3xl border border-muted/20 bg-white/90 p-8 shadow-lg">
           <div className="space-y-4">
-            <h1 className="text-4xl font-semibold leading-tight text-text">{data.title}</h1>
+            <h1 className="text-4xl font-semibold leading-tight text-text">{spec.title}</h1>
             <div className="flex flex-wrap gap-2">
-              {data.tags.map((tag) => (
+              {spec.tags.map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary"
@@ -100,17 +173,42 @@ export const SpecDetailPage = () => {
                 </span>
               ))}
             </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted/10 px-3 py-1 text-[0.65rem] font-medium text-muted">
+                <History className="h-3 w-3 text-primary" aria-hidden /> Version {spec.version}
+              </span>
+              {latestVersion && spec.version !== latestVersion ? (
+                <span className="text-[0.65rem] font-medium text-muted/70">Latest {latestVersion}</span>
+              ) : null}
+            </div>
+            {isViewingHistory ? (
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
+                Viewing version {spec.version} (latest {latestVersion}).{' '}
+                <button
+                  type="button"
+                  onClick={handleViewLatest}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  View latest
+                </button>
+              </div>
+            ) : null}
+            {isVersionLoadingState ? (
+              <div className="rounded-2xl border border-muted/30 bg-white/80 px-4 py-2 text-xs text-muted">
+                Loading version {targetVersion}…
+              </div>
+            ) : null}
           </div>
         </header>
-        <MarkdownView markdown={data.contentMd} />
+        <MarkdownView markdown={spec.contentMd} />
       </article>
       <aside className="space-y-6">
         <div className="rounded-3xl border border-muted/20 bg-white/90 p-6 shadow-lg">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Actions</h3>
             <div className="flex flex-wrap items-center gap-2">
-              <CopyMarkdownButton shortId={data.shortId} />
-              <DownloadButton shortId={data.shortId} />
+              <CopyMarkdownButton shortId={spec.shortId} />
+              <DownloadButton shortId={spec.shortId} />
               <Link
                 to={editPath}
                 onClick={(event) => {
@@ -167,7 +265,7 @@ export const SpecDetailPage = () => {
             <p className="mt-3 text-sm text-muted">
               {!user
                 ? 'Sign in to edit or delete this spec.'
-                : `Only ${data.author} can edit or delete this spec.`}
+                : `Only ${spec.author} can edit or delete this spec.`}
             </p>
             {!user && (
               <button
@@ -188,21 +286,32 @@ export const SpecDetailPage = () => {
                 <User className="h-4 w-4 text-primary" aria-hidden />
                 <dt className="text-xs font-semibold uppercase tracking-wide">Author</dt>
               </div>
-              <dd className="font-medium text-text">{data.author}</dd>
+              <dd className="font-medium text-text">{spec.author}</dd>
             </div>
             <div className="flex h-full flex-col gap-1 rounded-2xl border border-muted/10 bg-white/70 p-3 shadow-sm">
               <div className="flex items-center gap-2 text-muted">
                 <Hash className="h-4 w-4 text-primary" aria-hidden />
                 <dt className="text-xs font-semibold uppercase tracking-wide">Short ID</dt>
               </div>
-              <dd className="font-mono text-xs text-text break-all">{data.shortId}</dd>
+              <dd className="flex items-center justify-between gap-2 font-mono text-xs text-text">
+                <span className="break-all">{spec.shortId}</span>
+                <button
+                  type="button"
+                  onClick={handleCopyShortId}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-muted/40 bg-white/80 text-muted transition hover:border-primary/40 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  title="Copy Short ID"
+                  aria-label="Copy Short ID"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </dd>
             </div>
             <div className="flex h-full flex-col gap-1 rounded-2xl border border-muted/10 bg-white/70 p-3 shadow-sm">
               <div className="flex items-center gap-2 text-muted">
                 <Folder className="h-4 w-4 text-primary" aria-hidden />
                 <dt className="text-xs font-semibold uppercase tracking-wide">Category</dt>
               </div>
-              <dd className="font-medium capitalize text-text">{data.category}</dd>
+              <dd className="font-medium capitalize text-text">{spec.category}</dd>
             </div>
             <div className="flex h-full flex-col gap-1 rounded-2xl border border-muted/10 bg-white/70 p-3 shadow-sm">
               <div className="flex items-center gap-2 text-muted">
@@ -210,8 +319,8 @@ export const SpecDetailPage = () => {
                 <dt className="text-xs font-semibold uppercase tracking-wide">Tags</dt>
               </div>
               <dd className="flex flex-wrap gap-1 text-xs text-muted">
-                {data.tags.length > 0 ? (
-                  data.tags.map((tag) => (
+                {spec.tags.length > 0 ? (
+                  spec.tags.map((tag) => (
                     <span
                       key={tag}
                       className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-medium text-primary"
@@ -242,6 +351,73 @@ export const SpecDetailPage = () => {
             </div>
           </dl>
         </div>
+        {historyItems.length > 0 ? (
+          <div className="rounded-3xl border border-muted/20 bg-white/90 p-6 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">History</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                {totalHistoryCount > 0 ? (
+                  <span className="rounded-full bg-muted/10 px-2 py-0.5 text-[0.65rem] font-medium text-muted">
+                    {totalHistoryCount} {totalHistoryCount === 1 ? 'version' : 'versions'}
+                  </span>
+                ) : null}
+                {hasAdditionalHistory ? (
+                  <button
+                    type="button"
+                    onClick={() => setHistoryExpanded((prev) => !prev)}
+                    className="text-xs font-semibold text-primary underline underline-offset-2"
+                    aria-expanded={isHistoryExpanded}
+                  >
+                    {isHistoryExpanded ? 'Show fewer' : 'View full history'}
+                  </button>
+                ) : null}
+                {isViewingHistory ? (
+                  <button
+                    type="button"
+                    onClick={handleViewLatest}
+                    className="text-xs font-semibold text-primary underline underline-offset-2"
+                  >
+                    View latest
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {visibleHistoryItems.length > 0 ? (
+              <ul className="mt-4 space-y-3">
+                {visibleHistoryItems.map((item) => {
+                  const isActive = activeHistoryVersion === item.version;
+                  return (
+                    <li
+                      key={item.version}
+                      className={`rounded-2xl border bg-white/80 p-3 shadow-sm transition ${
+                        isActive ? 'border-primary/40 text-primary' : 'border-muted/20 text-text'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectVersion(item.version)}
+                        className="flex w-full flex-col items-start gap-1 text-left"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          Version {item.version}
+                          {latestVersion !== null && item.version === latestVersion ? (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-semibold text-primary">
+                              Latest
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="text-xs text-muted">{new Date(item.updatedAt).toLocaleString()}</span>
+                        <span className="text-xs text-muted/80">{item.summary || 'No summary'}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-4 text-xs text-muted">No previous versions yet.</p>
+            )}
+          </div>
+        ) : null}
       </aside>
     </section>
   );

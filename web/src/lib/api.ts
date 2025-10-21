@@ -192,6 +192,13 @@ export const useSpecDetail = (shortId: string) =>
     enabled: Boolean(shortId),
   });
 
+export const useSpecVersion = (shortId: string, version: number | null) =>
+  useQuery({
+    queryKey: ['spec', shortId, version],
+    queryFn: () => fetchJson<SpecDetail>('getSpecVersion', { shortId, version }),
+    enabled: Boolean(shortId) && version !== null,
+  });
+
 /** Specs by category */
 export const useSpecsByCategory = (slug: string) =>
   useQuery({

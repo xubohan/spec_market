@@ -9,10 +9,28 @@ export type SpecSummary = {
   ownerId?: string | null;
   createdAt: string;
   updatedAt: string;
+  version: number;
+};
+
+export type SpecHistoryItem = {
+  shortId: string;
+  version: number;
+  title: string;
+  summary: string;
+  author: string;
+  updatedAt: string;
+};
+
+export type SpecHistory = {
+  latestVersion: number;
+  items: SpecHistoryItem[];
+  total: number;
 };
 
 export type SpecDetail = SpecSummary & {
   contentMd: string;
+  isLatest: boolean;
+  history: SpecHistory;
 };
 
 export type PaginatedSpecs = {
