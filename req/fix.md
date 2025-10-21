@@ -21,6 +21,13 @@
 - **Implementation**: 为 `/listSpecs` 增加 `author` 查询参数并在 `SpecRepository.list_specs` 中统一去除前缀 `@`、忽略大小写进行精确匹配；首页 `useSpecs` 请求携带作者参数，并新增 API 测试覆盖多账号上传后的检索场景。
 - **Verification**: `pytest backend/tests/test_api.py::test_list_specs_filters_by_author_username`、`npm run build`
 
+## Spec detail header simplification
+
+- **Date**: 2025-10-23
+- **Motivation**: 详情页标题区信息密度过高，历史提示分散，Meta 栏的复制按钮样式突兀，导致视觉层级混乱、最新版本提示不够直观。
+- **Implementation**: 标题区仅保留标题与版本徽章，将“Viewing version”提示与“Latest”徽章并排展示且通过点击 Latest 跳转最新版本；历史卡片改为固定高度的滚动列表，仅以弱化字体呈现最近版本；Meta 中的 Short ID 改为点击文字即可复制。
+- **Verification**: `npm run build`，手动在规格详情页切换版本并验证 Latest 提示、历史滚动与 Short ID 点击复制均正常展示。
+
 ## Unified login flow and author binding
 
 - **Date**: 2025-10-21

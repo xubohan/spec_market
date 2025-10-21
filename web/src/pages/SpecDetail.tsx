@@ -5,7 +5,7 @@ import { MarkdownView } from '../components/MarkdownView';
 import { CopyMarkdownButton } from '../components/CopyMarkdownButton';
 import { DownloadButton } from '../components/DownloadButton';
 import { useAuth } from '../lib/auth';
-import { Calendar, Clock3, Copy, Edit3, Folder, Hash, History, Tag, Trash2, User } from 'lucide-react';
+import { Calendar, Clock3, Edit3, Folder, Hash, History, Tag, Trash2, User } from 'lucide-react';
 
 export const SpecDetailPage = () => {
   const { shortId = '' } = useParams();
@@ -16,14 +16,12 @@ export const SpecDetailPage = () => {
   const deleteMutation = useDeleteSpec();
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [activeVersion, setActiveVersion] = useState<number | null>(null);
-  const [isHistoryExpanded, setHistoryExpanded] = useState(false);
   const redirectTarget = useMemo(
     () => `${location.pathname}${location.search}`,
     [location.pathname, location.search],
   );
   useEffect(() => {
     setActiveVersion(null);
-    setHistoryExpanded(false);
   }, [shortId]);
 
   const targetVersion = useMemo(() => {
@@ -41,17 +39,15 @@ export const SpecDetailPage = () => {
   const history = spec?.history ?? data?.history;
   const historyItems = history?.items ?? [];
   const latestVersion = history?.latestVersion ?? spec?.version ?? null;
-  const previewHistoryItems = useMemo(() => {
+  const archivedHistoryItems = useMemo(() => {
     if (!historyItems.length) {
       return [];
     }
-    if (historyItems.length === 1 || latestVersion === null) {
+    if (latestVersion === null) {
       return historyItems;
     }
-    return historyItems.filter((item) => item.version !== latestVersion).slice(0, 3);
+    return historyItems.filter((item) => item.version !== latestVersion);
   }, [historyItems, latestVersion]);
-  const hasAdditionalHistory = historyItems.length > previewHistoryItems.length;
-  const visibleHistoryItems = isHistoryExpanded ? historyItems : previewHistoryItems;
   const totalHistoryCount = history?.total ?? historyItems.length;
   const normalizedAuthor = useMemo(
     () => (spec?.author ?? '').replace(/^@/, ''),
@@ -163,41 +159,32 @@ export const SpecDetailPage = () => {
         <header className="rounded-3xl border border-muted/20 bg-white/90 p-8 shadow-lg">
           <div className="space-y-4">
             <h1 className="text-4xl font-semibold leading-tight text-text">{spec.title}</h1>
-            <div className="flex flex-wrap gap-2">
-              {spec.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary"
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-muted">
               <span className="inline-flex items-center gap-1 rounded-full bg-muted/10 px-3 py-1 text-[0.65rem] font-medium text-muted">
                 <History className="h-3 w-3 text-primary" aria-hidden /> Version {spec.version}
               </span>
-              {latestVersion && spec.version !== latestVersion ? (
-                <span className="text-[0.65rem] font-medium text-muted/70">Latest {latestVersion}</span>
-              ) : null}
+              <div className="flex items-center gap-2">
+                {latestVersion ? (
+                  <button
+                    type="button"
+                    onClick={handleViewLatest}
+                    disabled={!isViewingHistory}
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[0.65rem] font-medium transition focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+                      isViewingHistory
+                        ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                        : 'cursor-default bg-muted/10 text-muted'
+                    }`}
+                    aria-label={
+                      isViewingHistory
+                        ? `View latest version ${latestVersion}`
+                        : `Latest version ${latestVersion}`
+                    }
+                  >
+                    LATEST VERSION {latestVersion}
+                  </button>
+                ) : null}
+              </div>
             </div>
-            {isViewingHistory ? (
-              <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
-                Viewing version {spec.version} (latest {latestVersion}).{' '}
-                <button
-                  type="button"
-                  onClick={handleViewLatest}
-                  className="font-semibold underline underline-offset-2"
-                >
-                  View latest
-                </button>
-              </div>
-            ) : null}
-            {isVersionLoadingState ? (
-              <div className="rounded-2xl border border-muted/30 bg-white/80 px-4 py-2 text-xs text-muted">
-                Loading version {targetVersion}…
-              </div>
-            ) : null}
           </div>
         </header>
         <MarkdownView markdown={spec.contentMd} />
@@ -293,16 +280,13 @@ export const SpecDetailPage = () => {
                 <Hash className="h-4 w-4 text-primary" aria-hidden />
                 <dt className="text-xs font-semibold uppercase tracking-wide">Short ID</dt>
               </div>
-              <dd className="flex items-center justify-between gap-2 font-mono text-xs text-text">
-                <span className="break-all">{spec.shortId}</span>
+              <dd>
                 <button
                   type="button"
                   onClick={handleCopyShortId}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-muted/40 bg-white/80 text-muted transition hover:border-primary/40 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  title="Copy Short ID"
-                  aria-label="Copy Short ID"
+                  className="w-full break-all rounded-xl px-2 py-1 text-left font-mono text-xs text-text transition hover:bg-primary/5 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  {spec.shortId}
                 </button>
               </dd>
             </div>
@@ -355,42 +339,21 @@ export const SpecDetailPage = () => {
           <div className="rounded-3xl border border-muted/20 bg-white/90 p-6 shadow-lg">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">History</h3>
-              <div className="flex flex-wrap items-center gap-2">
-                {totalHistoryCount > 0 ? (
-                  <span className="rounded-full bg-muted/10 px-2 py-0.5 text-[0.65rem] font-medium text-muted">
-                    {totalHistoryCount} {totalHistoryCount === 1 ? 'version' : 'versions'}
-                  </span>
-                ) : null}
-                {hasAdditionalHistory ? (
-                  <button
-                    type="button"
-                    onClick={() => setHistoryExpanded((prev) => !prev)}
-                    className="text-xs font-semibold text-primary underline underline-offset-2"
-                    aria-expanded={isHistoryExpanded}
-                  >
-                    {isHistoryExpanded ? 'Show fewer' : 'View full history'}
-                  </button>
-                ) : null}
-                {isViewingHistory ? (
-                  <button
-                    type="button"
-                    onClick={handleViewLatest}
-                    className="text-xs font-semibold text-primary underline underline-offset-2"
-                  >
-                    View latest
-                  </button>
-                ) : null}
-              </div>
+              {totalHistoryCount > 0 ? (
+                <span className="rounded-full bg-muted/10 px-2 py-0.5 text-[0.65rem] font-medium text-muted">
+                  {totalHistoryCount} {totalHistoryCount === 1 ? 'version' : 'versions'}
+                </span>
+              ) : null}
             </div>
-            {visibleHistoryItems.length > 0 ? (
-              <ul className="mt-4 space-y-3">
-                {visibleHistoryItems.map((item) => {
+            {archivedHistoryItems.length > 0 ? (
+              <ul className="mt-4 space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '9.5rem' }}>
+                {archivedHistoryItems.map((item) => {
                   const isActive = activeHistoryVersion === item.version;
                   return (
                     <li
                       key={item.version}
                       className={`rounded-2xl border bg-white/80 p-3 shadow-sm transition ${
-                        isActive ? 'border-primary/40 text-primary' : 'border-muted/20 text-text'
+                        isActive ? 'border-primary/40 bg-primary/5 text-primary' : 'border-muted/20 text-muted'
                       }`}
                     >
                       <button
@@ -398,7 +361,7 @@ export const SpecDetailPage = () => {
                         onClick={() => handleSelectVersion(item.version)}
                         className="flex w-full flex-col items-start gap-1 text-left"
                       >
-                        <span className="flex items-center gap-2 text-sm font-semibold">
+                        <span className="flex items-center gap-2 text-sm font-medium text-text">
                           Version {item.version}
                           {latestVersion !== null && item.version === latestVersion ? (
                             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[0.65rem] font-semibold text-primary">
@@ -406,8 +369,8 @@ export const SpecDetailPage = () => {
                             </span>
                           ) : null}
                         </span>
-                        <span className="text-xs text-muted">{new Date(item.updatedAt).toLocaleString()}</span>
-                        <span className="text-xs text-muted/80">{item.summary || 'No summary'}</span>
+                        <span className="text-[0.65rem] text-muted">{new Date(item.updatedAt).toLocaleString()}</span>
+                        <span className="text-[0.65rem] text-muted/80">{item.summary || 'No summary'}</span>
                       </button>
                     </li>
                   );
