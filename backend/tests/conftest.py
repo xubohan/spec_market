@@ -40,6 +40,7 @@ def override_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Gene
     data_path = tmp_path / "specs.json"
     data_path.write_text(json.dumps(data), encoding="utf-8")
     mongo_module._collection = mongo_module._InMemoryCollection()
+    mongo_module._user_collection = mongo_module._InMemoryUserCollection()
     mongo_module._client = None
     repo = SpecRepository(data_path=data_path)
     monkeypatch.setattr(app_module, "repository", repo)

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ApiResponse, Category, PaginatedSpecs, SpecDetail, Tag } from '../types/spec';
+import { AuthCredentials, AuthResponse, AuthUser } from '../types/auth';
 
 export class ApiRequestError extends Error {
   statusCode: number;
@@ -69,6 +70,15 @@ async function fetchJson<T>(path: string, params?: Record<string, string | numbe
   return extractApiData<T>(response);
 }
 
+async function sendJson<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(buildUrl(path), {
+    credentials: 'include',
+    cache: 'no-store',
+    ...init,
+  });
+  return extractApiData<T>(response);
+}
+
 /** -------- Health & Ping (IMPORTANT: /healthz has NO /specmarket/v1 prefix) -------- */
 const HEALTHZ_PATH = '/healthz';
 
@@ -95,6 +105,42 @@ export async function ping(): Promise<Record<string, unknown>> {
   } catch {
     return {};
   }
+}
+
+export async function fetchCurrentUser(): Promise<AuthResponse> {
+  return fetchJson<AuthResponse>('auth/me');
+}
+
+export async function registerUser(credentials: AuthCredentials): Promise<AuthUser> {
+  const data = await sendJson<AuthResponse>('auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+  if (!data.user) {
+    throw new ApiRequestError(0, 'Registration failed');
+  }
+  return data.user;
+}
+
+export async function loginUser(credentials: AuthCredentials): Promise<AuthUser> {
+  const data = await sendJson<AuthResponse>('auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+  if (!data.user) {
+    throw new ApiRequestError(0, 'Login failed');
+  }
+  return data.user;
+}
+
+export async function logoutUser(): Promise<void> {
+  await sendJson<Record<string, never>>('auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
 }
 
 /** -------------------- Queries -------------------- */
@@ -183,7 +229,6 @@ export const copyMarkdown = async (shortId: string) => {
 /** -------------------- Mutations -------------------- */
 
 type UploadPayload = {
-  token: string;          // Admin token (X-Admin-Token)
   formData: FormData;     // Must contain the file and metadata fields the backend expects
 };
 
@@ -194,9 +239,6 @@ export const useUploadSpec = () =>
       const response = await fetch(buildUrl('uploadSpec'), {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'X-Admin-Token': payload.token,
-        },
         body: payload.formData,
         cache: 'no-store',
       });
@@ -205,13 +247,11 @@ export const useUploadSpec = () =>
   });
 
 type UpdateSpecPayload = {
-  token: string;
   shortId: string;
   title: string;
   summary: string;
   category: string;
   tags: string[];
-  author: string;
   contentMd: string;
 };
 
@@ -226,7 +266,6 @@ export const useUpdateSpec = () => {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Token': payload.token,
         },
         body: JSON.stringify({
           shortId: payload.shortId,
@@ -234,7 +273,6 @@ export const useUpdateSpec = () => {
           summary: payload.summary,
           category: payload.category,
           tags: payload.tags,
-          author: payload.author,
           contentMd: payload.contentMd,
         }),
         cache: 'no-store',
@@ -255,7 +293,6 @@ export const useUpdateSpec = () => {
           summary: variables.summary,
           category: variables.category,
           tags: variables.tags,
-          author: variables.author,
           contentMd: variables.contentMd,
           updatedAt,
         };
@@ -276,7 +313,6 @@ export const useUpdateSpec = () => {
                   summary: variables.summary,
                   category: variables.category,
                   tags: variables.tags,
-                  author: variables.author,
                   updatedAt,
                 }
               : item,
@@ -291,7 +327,6 @@ export const useUpdateSpec = () => {
 };
 
 type DeleteSpecPayload = {
-  token: string;
   shortId: string;
 };
 
@@ -300,13 +335,12 @@ export const useDeleteSpec = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ token, shortId }: DeleteSpecPayload) => {
+    mutationFn: async ({ shortId }: DeleteSpecPayload) => {
       const response = await fetch(buildUrl('deleteSpec'), {
         method: 'DELETE',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Token': token,
         },
         body: JSON.stringify({ shortId }),
         cache: 'no-store',
@@ -335,4 +369,4 @@ export const useDeleteSpec = () => {
 /** Build app route (not API) for spec detail page */
 export const buildSpecLink = (shortId: string) => `/specs/${shortId}`;
 
-export type { Category, Tag, PaginatedSpecs, SpecDetail };
+export type { Category, Tag, PaginatedSpecs, SpecDetail, AuthUser };

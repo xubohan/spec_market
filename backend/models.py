@@ -44,6 +44,7 @@ class Spec(BaseModel):
     category: str
     tags: List[str]
     author: str
+    ownerId: Optional[str] = None
     createdAt: datetime
     updatedAt: datetime
     contentMd: str = Field(..., alias="contentMd")
@@ -66,6 +67,7 @@ class SpecSummary(BaseModel):
     category: str
     tags: List[str]
     author: str
+    ownerId: Optional[str] = None
     createdAt: datetime
     updatedAt: datetime
 
@@ -104,7 +106,6 @@ class UploadPayload(BaseModel):
     category: str
     summary: str
     tags: List[str]
-    author: str
     shortId: Optional[str] = None
 
     @validator("shortId")
@@ -122,7 +123,6 @@ class UpdatePayload(BaseModel):
     summary: str
     category: str
     tags: List[str]
-    author: str
     contentMd: str
 
     @validator("shortId")
@@ -168,7 +168,7 @@ class APIResponse(BaseModel):
 def spec_to_document(spec: Spec) -> Dict[str, Any]:
     """Serialize a Spec for Mongo persistence."""
 
-    return {
+    document = {
         "shortId": spec.shortId,
         "title": spec.title,
         "summary": spec.summary,
@@ -179,4 +179,41 @@ def spec_to_document(spec: Spec) -> Dict[str, Any]:
         "createdAt": spec.createdAt,
         "updatedAt": spec.updatedAt,
     }
+    if spec.ownerId:
+        document["ownerId"] = spec.ownerId
+    return document
+
+
+class User(BaseModel):
+    id: str = Field(..., alias="id")
+    username: str
+    createdAt: datetime
+    updatedAt: datetime
+
+    class Config:
+        allow_population_by_field_name = True
+
+
+class UserCredentials(BaseModel):
+    username: str
+    password: str
+
+    @validator("username")
+    def validate_username(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("username is required")
+        if len(normalized) < 3:
+            raise ValueError("username must be at least 3 characters")
+        if len(normalized) > 32:
+            raise ValueError("username must be at most 32 characters")
+        return normalized
+
+    @validator("password")
+    def validate_password(cls, value: str) -> str:
+        if not value or len(value) < 8:
+            raise ValueError("password must be at least 8 characters")
+        if len(value) > 128:
+            raise ValueError("password must be at most 128 characters")
+        return value
 

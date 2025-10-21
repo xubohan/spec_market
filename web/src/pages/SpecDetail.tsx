@@ -1,24 +1,37 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ApiRequestError, useDeleteSpec, useSpecDetail } from '../lib/api';
 import { MarkdownView } from '../components/MarkdownView';
 import { CopyMarkdownButton } from '../components/CopyMarkdownButton';
 import { DownloadButton } from '../components/DownloadButton';
-import { useAdminToken } from '../lib/auth';
+import { useAuth } from '../lib/auth';
 import { Calendar, Clock3, Edit3, Folder, Hash, Tag, Trash2, User } from 'lucide-react';
 
 export const SpecDetailPage = () => {
   const { shortId = '' } = useParams();
   const { data, isLoading } = useSpecDetail(shortId);
   const navigate = useNavigate();
-  const { token, setToken } = useAdminToken();
+  const location = useLocation();
+  const { user } = useAuth();
   const deleteMutation = useDeleteSpec();
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [localToken, setLocalToken] = useState(() => token ?? '');
-
-  useEffect(() => {
-    setLocalToken(token ?? '');
-  }, [token]);
+  const redirectTarget = useMemo(
+    () => `${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
+  const normalizedAuthor = useMemo(
+    () => (data?.author ?? '').replace(/^@/, ''),
+    [data?.author],
+  );
+  const isOwner = useMemo(() => {
+    if (!user || !data) {
+      return false;
+    }
+    if (data.ownerId) {
+      return data.ownerId === user.id;
+    }
+    return normalizedAuthor === user.username;
+  }, [user, data, normalizedAuthor]);
 
   if (isLoading) {
     return <p className="text-muted">Loading...</p>;
@@ -32,8 +45,12 @@ export const SpecDetailPage = () => {
     if (!data) {
       return;
     }
-    if (!token) {
-      setMessage({ type: 'error', text: 'Please save your Admin-Token before deleting this spec.' });
+    if (!user) {
+      navigate('/login', { state: { from: redirectTarget } });
+      return;
+    }
+    if (!isOwner) {
+      setMessage({ type: 'error', text: 'Only the author can delete this spec.' });
       return;
     }
     const confirmed = window.confirm('Are you sure you want to delete this spec? This action cannot be undone.');
@@ -42,7 +59,7 @@ export const SpecDetailPage = () => {
     }
     setMessage(null);
     try {
-      await deleteMutation.mutateAsync({ token, shortId: data.shortId });
+      await deleteMutation.mutateAsync({ shortId: data.shortId });
       navigate('/', { replace: true });
     } catch (error) {
       if (error instanceof ApiRequestError) {
@@ -53,13 +70,19 @@ export const SpecDetailPage = () => {
     }
   };
 
-  const handleSaveToken = () => {
-    setToken(localToken || null);
-    setMessage({ type: 'success', text: 'Admin token saved.' });
-  };
-
   const formattedUpdatedAt = new Date(data.updatedAt).toLocaleString();
   const formattedCreatedAt = new Date(data.createdAt).toLocaleString();
+  const editPath = `/specs/${data.shortId}/edit`;
+  const canEdit = !!user && isOwner;
+  const canDelete = !!user && isOwner;
+  const editTitle = !user ? 'Sign in to edit' : canEdit ? 'Edit Spec' : 'Only the author can edit';
+  const deleteTitle = deleteMutation.isPending
+    ? 'Deleting Spec…'
+    : !user
+    ? 'Sign in to delete'
+    : canDelete
+    ? 'Delete Spec'
+    : 'Only the author can delete';
 
   return (
     <section className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -89,42 +112,44 @@ export const SpecDetailPage = () => {
               <CopyMarkdownButton shortId={data.shortId} />
               <DownloadButton shortId={data.shortId} />
               <Link
-                to={`/specs/${data.shortId}/edit`}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-muted/30 bg-white/80 text-muted transition hover:border-primary/40 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                title="Edit Spec"
-                aria-label="Edit Spec"
+                to={editPath}
+                onClick={(event) => {
+                  if (!user) {
+                    event.preventDefault();
+                    navigate('/login', { state: { from: editPath } });
+                    return;
+                  }
+                  if (!canEdit) {
+                    event.preventDefault();
+                    setMessage({ type: 'error', text: 'Only the author can edit this spec.' });
+                  }
+                }}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border border-muted/30 bg-white/80 text-muted transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                  !user || canEdit
+                    ? 'hover:border-primary/40 hover:text-primary'
+                    : 'cursor-not-allowed opacity-50'
+                }`}
+                title={editTitle}
+                aria-label={editTitle}
+                tabIndex={!user || canEdit ? 0 : -1}
+                aria-disabled={user ? !canEdit : false}
               >
                 <Edit3 className="h-4 w-4" />
               </Link>
               <button
                 onClick={handleDelete}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-white/80 text-red-500 transition hover:border-red-400 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-60"
-                title={deleteMutation.isPending ? 'Deleting Spec…' : 'Delete Spec'}
-                aria-label={deleteMutation.isPending ? 'Deleting Spec…' : 'Delete Spec'}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-white/80 text-red-500 transition focus:outline-none focus:ring-2 focus:ring-red-200 ${
+                  canDelete
+                    ? 'hover:border-red-400 hover:bg-red-50'
+                    : !user
+                    ? 'hover:border-red-400 hover:bg-red-50'
+                    : 'cursor-not-allowed opacity-50'
+                }`}
+                title={deleteTitle}
+                aria-label={deleteTitle}
                 disabled={deleteMutation.isPending}
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <div className="mt-4 space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted" htmlFor="admin-token-input">
-              Admin-Token
-            </label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                id="admin-token-input"
-                value={localToken}
-                onChange={(event) => setLocalToken(event.target.value)}
-                placeholder="Enter Admin-Token"
-                className="flex-1 rounded-lg border border-muted/30 px-3 py-2 text-sm"
-              />
-              <button
-                type="button"
-                onClick={handleSaveToken}
-                className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
-              >
-                Save Token
               </button>
             </div>
           </div>
@@ -136,6 +161,25 @@ export const SpecDetailPage = () => {
             </p>
           )}
         </div>
+        {/* {(!user || !isOwner) && (
+          <div className="rounded-3xl border border-muted/20 bg-white/90 p-6 shadow-lg">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Access</h3>
+            <p className="mt-3 text-sm text-muted">
+              {!user
+                ? 'Sign in to edit or delete this spec.'
+                : `Only ${data.author} can edit or delete this spec.`}
+            </p>
+            {!user && (
+              <button
+                type="button"
+                onClick={() => navigate('/login', { state: { from: redirectTarget } })}
+                className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90"
+              >
+                Go to login
+              </button>
+            )}
+          </div>
+        )} */}
         <div className="rounded-3xl border border-muted/20 bg-white/90 p-6 shadow-lg">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Meta</h3>
           <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">

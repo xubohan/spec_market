@@ -1,42 +1,84 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-type AdminTokenContextValue = {
-  token: string | null;
-  setToken: (token: string | null) => void;
+import { AuthCredentials, AuthUser } from '../types/auth';
+import { fetchCurrentUser, loginUser, logoutUser, registerUser } from './api';
+
+type AuthContextValue = {
+  user: AuthUser | null;
+  isLoading: boolean;
+  login: (credentials: AuthCredentials) => Promise<void>;
+  register: (credentials: AuthCredentials) => Promise<void>;
+  logout: () => Promise<void>;
+  setUser: (user: AuthUser | null) => void;
 };
 
-const AdminTokenContext = createContext<AdminTokenContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const STORAGE_KEY = 'spec-market-admin-token';
-
-export const AdminTokenProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setTokenState] = useState<string | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setTokenState(stored);
-    }
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      try {
+        const response = await fetchCurrentUser();
+        if (!cancelled) {
+          setUser(response.user ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const setToken = (value: string | null) => {
-    if (value) {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-    setTokenState(value);
-  };
+  const login = useCallback(async (credentials: AuthCredentials) => {
+    const authenticated = await loginUser(credentials);
+    setUser(authenticated);
+  }, []);
 
-  const value = useMemo(() => ({ token, setToken }), [token]);
+  const register = useCallback(async (credentials: AuthCredentials) => {
+    const registered = await registerUser(credentials);
+    setUser(registered);
+  }, []);
 
-  return <AdminTokenContext.Provider value={value}>{children}</AdminTokenContext.Provider>;
+  const logout = useCallback(async () => {
+    await logoutUser();
+    setUser(null);
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, isLoading, login, register, logout, setUser }),
+    [user, isLoading, login, register, logout],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAdminToken = () => {
-  const ctx = useContext(AdminTokenContext);
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error('useAdminToken must be used within AdminTokenProvider');
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return ctx;
 };

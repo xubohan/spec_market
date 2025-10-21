@@ -1,27 +1,38 @@
-import { FormEvent, useState } from 'react';
-import { useAdminToken } from '../lib/auth';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import { ApiRequestError, useUploadSpec } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
 export const UploadPage = () => {
-  const { token, setToken } = useAdminToken();
-  const [localToken, setLocalToken] = useState(token ?? '');
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [message, setMessage] = useState<string | null>(null);
   const [uploadedShortId, setUploadedShortId] = useState<string | null>(null);
   const mutation = useUploadSpec();
 
-  const handleSaveToken = () => {
-    setToken(localToken || null);
-    setMessage('Admin token saved.');
-    setUploadedShortId(null);
-  };
+  const redirectTarget = useMemo(
+    () => `${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate('/login', { replace: true, state: { from: redirectTarget } });
+    }
+  }, [isLoading, user, navigate, redirectTarget]);
+
+  if (isLoading) {
+    return <p className="text-muted">Checking session…</p>;
+  }
+
+  if (!user) {
+    return null;
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) {
-      setMessage('Please save your Admin-Token before uploading.');
-      setUploadedShortId(null);
-      return;
-    }
     setMessage(null);
     setUploadedShortId(null);
     const formElement = event.currentTarget;
@@ -33,7 +44,7 @@ export const UploadPage = () => {
     }
     const formData = new FormData(formElement);
     try {
-      const result = await mutation.mutateAsync({ token, formData });
+      const result = await mutation.mutateAsync({ formData });
       setMessage('Upload successful.');
       setUploadedShortId(result.shortId);
       formElement.reset();
@@ -49,64 +60,54 @@ export const UploadPage = () => {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="rounded-2xl bg-card p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Admin Upload</h1>
-        <p className="mt-2 text-sm text-muted">
-          Provide your Admin-Token to authenticate uploads. This temporarily replaces a dedicated login page.
-        </p>
-        <div className="mt-4 flex flex-col gap-3 md:flex-row">
-          <input
-            value={localToken}
-            onChange={(e) => setLocalToken(e.target.value)}
-            placeholder="Enter Admin-Token"
-            className="flex-1 rounded-lg border border-muted/30 px-4 py-2"
-          />
-          <button
-            onClick={handleSaveToken}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
-          >
-            Save Token
-          </button>
-        </div>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-card p-6 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-4 rounded-2xl bg-card p-6 shadow-sm">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-semibold text-text">Upload a spec</h1>
+          <p className="text-sm text-muted">
+            Files uploaded from this page will be attributed to{' '}
+            <span className="font-semibold text-primary">@{user.username}</span>.
+          </p>
+        </header>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Title
+              <input name="title" required className="rounded-lg border border-muted/30 px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Category
+              <input name="category" required className="rounded-lg border border-muted/30 px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Tags (comma separated)
+              <input name="tags" className="rounded-lg border border-muted/30 px-3 py-2" />
+            </label>
+          </div>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Title
-            <input name="title" required className="rounded-lg border border-muted/30 px-3 py-2" />
+            Summary
+            <textarea name="summary" rows={3} className="rounded-lg border border-muted/30 px-3 py-2" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Category
-            <input name="category" required className="rounded-lg border border-muted/30 px-3 py-2" />
+            Markdown content
+            <textarea name="content" rows={8} className="rounded-lg border border-muted/30 px-3 py-2" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
-            Tags (comma separated)
-            <input name="tags" className="rounded-lg border border-muted/30 px-3 py-2" />
+            Or upload Markdown file
+            <input type="file" name="file" accept=".md,text/markdown" />
           </label>
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Author
-            <input name="author" required className="rounded-lg border border-muted/30 px-3 py-2" />
-          </label>
-        </div>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Summary
-          <textarea name="summary" rows={3} className="rounded-lg border border-muted/30 px-3 py-2" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Markdown content
-          <textarea name="content" rows={8} className="rounded-lg border border-muted/30 px-3 py-2" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Or upload Markdown file
-          <input type="file" name="file" accept=".md,text/markdown" />
-        </label>
-        <button
-          type="submit"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          disabled={mutation.isPending}
-        >
-          {mutation.isPending ? 'Uploading...' : 'Upload Spec'}
-        </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="submit"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? 'Uploading…' : 'Upload Spec'}
+            </button>
+            <p className="text-xs text-muted">
+              The author field is generated automatically based on your account. You can edit content and metadata later from the spec detail page.
+            </p>
+          </div>
+        </form>
         {message && <p className="text-sm text-muted">{message}</p>}
         {uploadedShortId && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -124,7 +125,7 @@ export const UploadPage = () => {
             </button>
           </div>
         )}
-      </form>
+      </div>
     </section>
   );
 };

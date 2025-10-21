@@ -9,12 +9,14 @@ import { TagListPage } from '../pages/TagList';
 import { SpecDetailPage } from '../pages/SpecDetail';
 import { EditSpecPage } from '../pages/EditSpec';
 import { UploadPage } from '../pages/Upload';
-import { AdminTokenProvider } from '../lib/auth';
+import { AuthProvider } from '../lib/auth';
 import { HeaderBar } from '../components/HeaderBar';
+import { AppTopBar } from '../components/AppTopBar';
+import { LoginPage } from '../pages/Login';
 
 function AppLayout() {
   return (
-    <AdminTokenProvider>
+    <AuthProvider>
       <div className="min-h-screen bg-background text-text">
         <ScrollRestoration />
         <div className="flex min-h-screen">
@@ -24,7 +26,8 @@ function AppLayout() {
               aria-hidden
               className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/70 via-transparent to-primary/15"
             />
-            <div className="relative z-10 mx-auto flex max-w-5xl flex-col gap-10">
+            <div className="relative z-10 mx-auto flex max-w-5xl flex-col gap-8">
+              <AppTopBar />
               <HeaderBar />
               <Suspense fallback={<div>Loading...</div>}>
                 <Outlet />
@@ -33,7 +36,7 @@ function AppLayout() {
           </main>
         </div>
       </div>
-    </AdminTokenProvider>
+    </AuthProvider>
   );
 }
 
@@ -61,7 +64,8 @@ export const router = createBrowserRouter([
       { path: 'tags/:slug', element: <TagListPage /> },
       { path: 'specs/:shortId', element: <SpecDetailPage /> },
       { path: 'specs/:shortId/edit', element: <EditSpecPage /> },
-      { path: 'upload', element: <UploadPage /> }
+      { path: 'upload', element: <UploadPage /> },
+      { path: 'login', element: <LoginPage /> }
     ],
   },
 ]);

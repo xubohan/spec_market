@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
-from flask import Flask, Response, make_response, request, g
+import bcrypt
+from flask import Flask, Response, make_response, request, g, session
 from flask_cors import CORS
 from pymongo import errors as pymongo_errors
 from pydantic import ValidationError
@@ -19,22 +20,55 @@ from .models import (
     Spec,
     UploadPayload,
     UpdatePayload,
+    User,
+    UserCredentials,
     spec_to_document,
 )
-from .mongo import delete_spec_document, save_spec_document
+from .mongo import (
+    create_user_document,
+    delete_spec_document,
+    find_user_document_by_id,
+    find_user_document_by_username,
+    save_spec_document,
+    update_user_timestamp,
+)
 from .repository import repository
 from .utils import derive_short_id, generate_short_id
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    CORS(app, resources={r"/*": {"origins": settings.cors_origins}})
+    app.secret_key = settings.session_secret
+    app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+    app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
+    CORS(
+        app,
+        resources={r"/*": {"origins": settings.cors_origins}},
+        supports_credentials=True,
+    )
 
     logging.basicConfig(level=logging.INFO)
 
     @app.before_request
     def assign_trace_id() -> None:
         g.trace_id = f"req-{uuid.uuid4()}"
+        g.current_user = None
+
+    @app.before_request
+    def load_current_user() -> None:
+        user_id = session.get("user_id")
+        if not user_id:
+            return
+        document = find_user_document_by_id(user_id)
+        if not document:
+            session.pop("user_id", None)
+            return
+        g.current_user = User(
+            id=str(document.get("_id") or document.get("id")),
+            username=document.get("username", ""),
+            createdAt=document.get("createdAt"),
+            updatedAt=document.get("updatedAt"),
+        )
 
     @app.after_request
     def add_trace_header(response: Response) -> Response:
@@ -70,15 +104,85 @@ def create_app() -> Flask:
         response.headers["Content-Type"] = "application/json"
         return response
 
-    def require_admin_token(func: Callable) -> Callable:
+    def require_login(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            token = request.headers.get("X-Admin-Token")
-            if token != settings.admin_token:
-                return handle_error(BusinessErrorCode.UNAUTHORIZED, "Invalid admin token", 401)
+            if g.get("current_user") is None:
+                return handle_error(BusinessErrorCode.UNAUTHORIZED, "Login required", 401)
             return func(*args, **kwargs)
 
         return wrapper
+
+    def sanitize_user_response(user: User | None) -> Dict[str, Any]:
+        if not user:
+            return {"user": None}
+        return {"user": user.dict(by_alias=True)}
+
+    def spec_owned_by_user(spec: Spec, user: User) -> bool:
+        if spec.ownerId:
+            return spec.ownerId == user.id
+        normalized_author = (spec.author or "").lstrip("@")
+        return normalized_author == user.username
+
+    @app.route("/specmarket/v1/auth/register", methods=["POST"])
+    def register_user():
+        payload_json = request.get_json(silent=True) or {}
+        try:
+            credentials = UserCredentials(**payload_json)
+        except ValidationError as exc:
+            message = "; ".join(error["msg"] for error in exc.errors())
+            return handle_error(BusinessErrorCode.INVALID_ARG, message or "Invalid payload", 400)
+        password_hash = bcrypt.hashpw(credentials.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        try:
+            document = create_user_document(credentials.username, password_hash)
+        except pymongo_errors.DuplicateKeyError:
+            return handle_error(BusinessErrorCode.INVALID_ARG, "Username already exists", 400)
+        session["user_id"] = document["_id"]
+        session.permanent = True
+        user = User(
+            id=document["_id"],
+            username=document["username"],
+            createdAt=document["createdAt"],
+            updatedAt=document["updatedAt"],
+        )
+        return response_payload(sanitize_user_response(user), 201)
+
+    @app.route("/specmarket/v1/auth/login", methods=["POST"])
+    def login_user():
+        payload_json = request.get_json(silent=True) or {}
+        try:
+            credentials = UserCredentials(**payload_json)
+        except ValidationError as exc:
+            message = "; ".join(error["msg"] for error in exc.errors())
+            return handle_error(BusinessErrorCode.INVALID_ARG, message or "Invalid payload", 400)
+        document = find_user_document_by_username(credentials.username)
+        password_hash = document.get("passwordHash") if document else None
+        if not password_hash or not bcrypt.checkpw(credentials.password.encode("utf-8"), password_hash.encode("utf-8")):
+            return handle_error(BusinessErrorCode.UNAUTHORIZED, "Invalid username or password", 401)
+        session["user_id"] = document["_id"]
+        session.permanent = True
+        update_user_timestamp(document["_id"])
+        refreshed = find_user_document_by_id(document["_id"])
+        if refreshed:
+            document = refreshed
+        user = User(
+            id=document["_id"],
+            username=document["username"],
+            createdAt=document["createdAt"],
+            updatedAt=document["updatedAt"],
+        )
+        return response_payload(sanitize_user_response(user), 200)
+
+    @app.route("/specmarket/v1/auth/logout", methods=["POST"])
+    def logout_user():
+        session.pop("user_id", None)
+        g.current_user = None
+        return response_payload({}, 200)
+
+    @app.route("/specmarket/v1/auth/me")
+    def current_user():
+        user = g.get("current_user")
+        return response_payload(sanitize_user_response(user), 200)
 
     @app.route("/specmarket/v1/listSpecs")
     def list_specs():
@@ -126,7 +230,7 @@ def create_app() -> Flask:
         return response_payload(spec_dict)
 
     @app.route("/specmarket/v1/deleteSpec", methods=["DELETE"])
-    @require_admin_token
+    @require_login
     def delete_spec():
         payload = request.get_json(silent=True)
         short_id = None
@@ -138,6 +242,15 @@ def create_app() -> Flask:
         spec = repository.get_spec(short_id)
         if not spec:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
+        user: User | None = g.get("current_user")
+        if user is None:
+            return handle_error(BusinessErrorCode.UNAUTHORIZED, "Login required", 401)
+        if not spec_owned_by_user(spec, user):
+            return handle_error(
+                BusinessErrorCode.UNAUTHORIZED,
+                "You do not have permission to modify this spec",
+                403,
+            )
 
         removed = repository.delete_spec(short_id)
         if not removed:
@@ -202,9 +315,12 @@ def create_app() -> Flask:
         return response_payload(json.loads(tag_specs.json()))
 
     @app.route("/specmarket/v1/uploadSpec", methods=["POST"])
-    @require_admin_token
+    @require_login
     def upload_spec():
         form = request.form
+        user: User | None = g.get("current_user")
+        if user is None:
+            return handle_error(BusinessErrorCode.UNAUTHORIZED, "Login required", 401)
         file = request.files.get("file")
         content_md = form.get("content") or (file.read().decode("utf-8") if file else None)
         if not content_md:
@@ -215,7 +331,6 @@ def create_app() -> Flask:
             )
         tags_raw = form.get("tags", "")
         tags = [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
-        author = (form.get("author") or "").strip()
         legacy_slug = (form.get("slug") or "").strip() or None
         short_id_candidate = (form.get("shortId") or "").strip() or None
         existing = None
@@ -231,13 +346,16 @@ def create_app() -> Flask:
             category=form.get("category", "uncategorized"),
             summary=form.get("summary", ""),
             tags=tags,
-            author=author,
             shortId=short_id_candidate,
         )
-        if not payload.author:
-            return handle_error(BusinessErrorCode.INVALID_ARG, "author is required", 400)
         now = datetime.now(timezone.utc)
         existing = existing or (repository.get_spec(payload.shortId) if payload.shortId else None)
+        if existing and not spec_owned_by_user(existing, user):
+            return handle_error(
+                BusinessErrorCode.UNAUTHORIZED,
+                "You do not have permission to modify this spec",
+                403,
+            )
         created_at = existing.createdAt if existing else now
         if existing:
             short_id = existing.shortId
@@ -246,6 +364,8 @@ def create_app() -> Flask:
             while repository.get_spec(short_id):
                 short_id = generate_short_id()
         spec_id = existing.id if existing else f"spec-{short_id}"
+        owner_id = existing.ownerId if existing and existing.ownerId else user.id
+        author = f"@{user.username}"
         spec = Spec(
             id=spec_id,
             title=payload.title,
@@ -253,10 +373,11 @@ def create_app() -> Flask:
             summary=payload.summary,
             category=payload.category,
             tags=payload.tags,
-            author=payload.author,
+            author=author,
             createdAt=created_at,
             contentMd=content_md,
             updatedAt=now,
+            ownerId=owner_id,
         )
         document = spec_to_document(spec)
         try:
@@ -272,7 +393,7 @@ def create_app() -> Flask:
         return response_payload({"id": spec.id, "shortId": spec.shortId}, 201)
 
     @app.route("/specmarket/v1/updateSpec", methods=["PUT"])
-    @require_admin_token
+    @require_login
     def update_spec():
         payload_json = request.get_json(silent=True)
         if not payload_json:
@@ -286,9 +407,18 @@ def create_app() -> Flask:
         except ValidationError as exc:
             message = "; ".join(error["msg"] for error in exc.errors())
             return handle_error(BusinessErrorCode.INVALID_ARG, message or "Invalid payload", 400)
+        user: User | None = g.get("current_user")
+        if user is None:
+            return handle_error(BusinessErrorCode.UNAUTHORIZED, "Login required", 401)
         existing = repository.get_spec(payload.shortId)
         if not existing:
             return handle_error(BusinessErrorCode.NOT_FOUND, "Spec not found", 404)
+        if not spec_owned_by_user(existing, user):
+            return handle_error(
+                BusinessErrorCode.UNAUTHORIZED,
+                "You do not have permission to modify this spec",
+                403,
+            )
         now = datetime.now(timezone.utc)
         content_md = payload.contentMd
         spec = Spec(
@@ -298,10 +428,11 @@ def create_app() -> Flask:
             summary=payload.summary,
             category=payload.category,
             tags=payload.tags,
-            author=payload.author,
+            author=f"@{user.username}",
             createdAt=existing.createdAt,
             contentMd=content_md,
             updatedAt=now,
+            ownerId=existing.ownerId or user.id,
         )
         document = spec_to_document(spec)
         try:

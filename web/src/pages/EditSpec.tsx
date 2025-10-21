@@ -1,41 +1,58 @@
-import { FormEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAdminToken } from '../lib/auth';
+
 import { ApiRequestError, useSpecDetail, useUpdateSpec } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
 export const EditSpecPage = () => {
   const { shortId = '' } = useParams();
-  const { token, setToken } = useAdminToken();
-  const [localToken, setLocalToken] = useState(token ?? '');
+  const { user, isLoading: authLoading } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [message, setMessage] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
   const [category, setCategory] = useState('');
-  const [author, setAuthor] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [contentMd, setContentMd] = useState('');
-  const { data, isLoading, isError } = useSpecDetail(shortId, 'md');
+  const { data, isLoading, isError } = useSpecDetail(shortId);
   const mutation = useUpdateSpec();
   const queryClient = useQueryClient();
+
+  const redirectTarget = useMemo(
+    () => `${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true, state: { from: redirectTarget } });
+    }
+  }, [authLoading, user, navigate, redirectTarget]);
 
   useEffect(() => {
     if (data && !initialized) {
       setTitle(data.title);
       setSummary(data.summary ?? '');
       setCategory(data.category);
-      setAuthor(data.author);
       setTagsInput(data.tags.join(', '));
       setContentMd(data.contentMd ?? '');
       setInitialized(true);
     }
   }, [data, initialized]);
 
-  const handleSaveToken = () => {
-    setToken(localToken || null);
-    setMessage('Admin token saved.');
-  };
+  const isOwner = useMemo(() => {
+    if (!user || !data) {
+      return false;
+    }
+    if (data.ownerId) {
+      return data.ownerId === user.id;
+    }
+    const normalizedAuthor = (data.author || '').replace(/^@/, '');
+    return normalizedAuthor === user.username;
+  }, [user, data]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -43,8 +60,12 @@ export const EditSpecPage = () => {
       setMessage('Missing shortId in route.');
       return;
     }
-    if (!token) {
-      setMessage('Please save your Admin-Token before updating.');
+    if (!user) {
+      setMessage('Please sign in before updating.');
+      return;
+    }
+    if (!isOwner) {
+      setMessage('Only the author can update this spec.');
       return;
     }
     setMessage(null);
@@ -54,13 +75,11 @@ export const EditSpecPage = () => {
       .filter((tag) => tag.length > 0);
     try {
       await mutation.mutateAsync({
-        token,
         shortId,
         title,
         summary,
         category,
         tags,
-        author,
         contentMd,
       });
       await queryClient.invalidateQueries({ queryKey: ['spec', shortId] });
@@ -75,13 +94,19 @@ export const EditSpecPage = () => {
     }
   };
 
-  if (isLoading && !initialized) {
-    return <p className="text-muted">Loading...</p>;
+  if (authLoading || (isLoading && !initialized)) {
+    return <p className="text-muted">Loading…</p>;
   }
 
   if (isError || !data) {
     return <p className="text-muted">Spec not found.</p>;
   }
+
+  if (!user) {
+    return null;
+  }
+
+  const disableForm = mutation.isPending || !isOwner;
 
   return (
     <section className="flex flex-col gap-6">
@@ -90,7 +115,9 @@ export const EditSpecPage = () => {
           <div>
             <h1 className="text-2xl font-semibold">Edit Spec</h1>
             <p className="mt-1 text-sm text-muted">
-              Update the metadata or markdown content for this spec. Changes require a valid Admin-Token.
+              {isOwner
+                ? 'Update the metadata or markdown content for this spec.'
+                : 'You can view the spec content below. Only the author can apply changes.'}
             </p>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted">
@@ -104,21 +131,18 @@ export const EditSpecPage = () => {
             </Link>
           </div>
         </div>
-        <div className="mt-4 flex flex-col gap-3 md:flex-row">
-          <input
-            value={localToken}
-            onChange={(e) => setLocalToken(e.target.value)}
-            placeholder="Enter Admin-Token"
-            className="flex-1 rounded-lg border border-muted/30 px-4 py-2"
-          />
-          <button
-            onClick={handleSaveToken}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
-          >
-            Save Token
-          </button>
+        <div className="mt-3 rounded-xl border border-muted/20 bg-white/80 p-4 text-sm text-muted">
+          <p>
+            Author:{' '}
+            <span className="font-semibold text-primary">{data.author}</span>
+          </p>
         </div>
       </div>
+      {!isOwner && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          You’re signed in as <span className="font-semibold">@{user.username}</span>, but only {data.author} can edit or delete this spec.
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-card p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -127,7 +151,8 @@ export const EditSpecPage = () => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="rounded-lg border border-muted/30 px-3 py-2"
+              disabled={disableForm}
+              className="rounded-lg border border-muted/30 px-3 py-2 disabled:opacity-50"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -136,7 +161,8 @@ export const EditSpecPage = () => {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               required
-              className="rounded-lg border border-muted/30 px-3 py-2"
+              disabled={disableForm}
+              className="rounded-lg border border-muted/30 px-3 py-2 disabled:opacity-50"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -144,16 +170,8 @@ export const EditSpecPage = () => {
             <input
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              className="rounded-lg border border-muted/30 px-3 py-2"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            Author
-            <input
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              required
-              className="rounded-lg border border-muted/30 px-3 py-2"
+              disabled={disableForm}
+              className="rounded-lg border border-muted/30 px-3 py-2 disabled:opacity-50"
             />
           </label>
         </div>
@@ -163,7 +181,8 @@ export const EditSpecPage = () => {
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             rows={3}
-            className="rounded-lg border border-muted/30 px-3 py-2"
+            disabled={disableForm}
+            className="rounded-lg border border-muted/30 px-3 py-2 disabled:opacity-50"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
@@ -172,15 +191,16 @@ export const EditSpecPage = () => {
             value={contentMd}
             onChange={(e) => setContentMd(e.target.value)}
             rows={12}
-            className="rounded-lg border border-muted/30 px-3 py-2 font-mono"
+            disabled={disableForm}
+            className="rounded-lg border border-muted/30 px-3 py-2 font-mono disabled:opacity-50"
           />
         </label>
         <button
           type="submit"
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          disabled={mutation.isPending}
+          disabled={disableForm}
         >
-          {mutation.isPending ? 'Updating...' : 'Update Spec'}
+          {mutation.isPending ? 'Updating…' : isOwner ? 'Update Spec' : 'Only the author can update'}
         </button>
         {message && <p className="text-sm text-muted">{message}</p>}
       </form>

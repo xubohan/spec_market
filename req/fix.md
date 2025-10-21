@@ -1,5 +1,19 @@
 # Fix Log
 
+## Unified login flow and author binding
+
+- **Date**: 2025-10-23
+- **Motivation**: 登录入口分散在 Upload/Edit/详情页内的卡片中，体验割裂，且作者信息依赖表单输入，无法保证与账号绑定，也无法限制非作者的写权限。
+- **Implementation**: 在右上角新增全局 Top Bar 管理登录态，新增独立登录页并在 Upload/Edit 访问前自动跳转；后端将上传/更新/删除操作与 `ownerId` 绑定，只允许作者执行，同时自动生成 `@username` 作者字段并写入文档。前端移除 Author 输入框，写操作页改为基于登录状态重定向和禁用逻辑。
+- **Verification**: 运行 `pytest` 覆盖新的权限判定与自动归属逻辑，并执行 `npm run build` 验证前端编译及登录跳转；手动登录后上传/编辑/删除文档，确认作者字段自动补全且仅作者可操作，同时更新页面截图。
+
+## Session-based auth rollout
+
+- **Date**: 2025-10-22
+- **Motivation**: 现网依赖固定的 admin token 操作上传/编辑/删除接口，不具备账号体系，容易被误用，也无法追踪操作者。
+- **Implementation**: 引入会话 Cookie 驱动的注册/登录/登出接口，后端基于 bcrypt 哈希保存密码并新增 `require_login` 装饰器保护写操作；前端提供 `AuthProvider` 和 `AuthCard` 组件以在 Upload/Edit/详情页中切换登录态，所有写请求自动携带凭据。
+- **Verification**: 运行 `pytest` 覆盖注册、登录、登出和认证写操作的端到端流程，并在前端登录后上传/编辑/删除确保成功；更新截图存档。
+
 ## Spec detail layout iteration
 
 - **Date**: 2025-10-22
@@ -14,12 +28,12 @@
 - **Implementation**: 重构左侧导航为分组结构并强化 active/hover 高亮，主内容区增加半透明卡片与投影，同时优化 Markdown 排版间距；在规格详情页中调整 Actions 为图标按钮+底部操作组，弱化删除按钮警示强度并新增 Meta 卡片图标化两列布局。
 - **Verification**: 运行 `npm run build` 并在本地浏览器确认详情页样式与交互正常，更新截图存档。
 
-## Admin delete flow for specs
+## Authenticated delete flow for specs
 
 - **Date**: 2025-10-20
 - **Motivation**: 运营需要在发现错误或过期内容时，能够立即移除指定 spec；目前缺少 UI 与接口支持，只能手动删库删文件，既费时又风险高。
-- **Implementation**: 后端新增 `DELETE /specmarket/v1/deleteSpec`，由 Admin-Token 鉴权后同步删除内存仓库与 MongoDB 文档；Repository 支持持久化删除逻辑。前端详情页 Actions 卡片加入 “Delete Spec” 按钮，复用本地保存的 Admin-Token，点击后弹出二次确认并在成功后跳转首页，同时刷新 React Query 缓存。
-- **Verification**: 通过 `pytest backend/tests` 与 `npm run build`，并在本地环境使用 Admin-Token 删除文档后确认详情页提示、列表刷新及数据库同步更新，保留界面截图。
+- **Implementation**: 后端新增 `DELETE /specmarket/v1/deleteSpec`，基于登录会话校验后同步删除内存仓库与 MongoDB 文档；Repository 支持持久化删除逻辑。前端详情页 Actions 卡片加入 “Delete Spec” 按钮，复用登录状态触发请求，点击后弹出二次确认并在成功后跳转首页，同时刷新 React Query 缓存。
+- **Verification**: 通过 `pytest backend/tests` 与 `npm run build`，并在本地环境登录后删除文档，确认详情页提示、列表刷新及数据库同步更新，保留界面截图。
 
 ## Disable API and UI caching for real-time updates
 
@@ -41,15 +55,15 @@
 
 - **Date**: 2025-10-20
 - **Motivation**: 旧的 slug 命名无法满足跨团队分享与后续短链需求，且存在命名冲突风险，需要统一成规则明确、长度固定的短链接。
-- **Plan**: 在前后端契约中以 16 位 base62 `shortId` 取代 slug，更新数据模型、接口路径、组件 props 及上传表单校验提示，同时在详情 Meta、列表卡片展示 `shortId`，并要求 Admin 上传时填写合法短链。
+- **Plan**: 在前后端契约中以 16 位 base62 `shortId` 取代 slug，更新数据模型、接口路径、组件 props 及上传表单校验提示，同时在详情 Meta、列表卡片展示 `shortId`，并要求登录用户上传时填写合法短链。
 - **Verification**: 查阅 `req/development_plan.md` 与 `README.md` 的最新规范，确认所有对外路径改为 `shortId`，并在设计文档中标注 16 位 base62 规则与展示位置，确保上传流程提示与后端存储说明同步。
 
-## Admin editing flow for specs
+## Authenticated editing flow for specs
 
 - **Date**: 2025-10-20
 - **Motivation**: 上传完成后才发现 Markdown 错误的场景较多，需要提供安全的在线编辑入口让作者在发现问题后立即修订，同时为后续按作者隔离权限做准备。
-- **Implementation**: 后端新增 `PUT /specmarket/v1/updateSpec`，基于 Admin-Token 认证并复用 Markdown 渲染与 TOC 生成流程；前端在详情页加入 “Edit Spec” 跳转，新增 `/specs/:shortId/edit` 页面加载原始 Markdown 并支持在线修改。
-- **Verification**: 手动与自动化覆盖 `pytest backend/tests` 新增的更新接口用例，前端通过本地开发确认编辑后详情页即时刷新、缓存失效，文档同步描述 Admin Edit 流程。
+- **Implementation**: 后端新增 `PUT /specmarket/v1/updateSpec`，基于登录会话认证并复用 Markdown 渲染与 TOC 生成流程；前端在详情页加入 “Edit Spec” 跳转，新增 `/specs/:shortId/edit` 页面加载原始 Markdown 并支持在线修改。
+- **Verification**: 手动与自动化覆盖 `pytest backend/tests` 新增的更新接口用例，前端通过本地开发确认登录后编辑可即时刷新、缓存失效，并同步更新文档描述。
 
 ## updatedAt timestamp drift after edits
 

@@ -83,6 +83,9 @@ class SpecRepository:
             normalized["tags"] = [str(tags_value)]
         normalized.pop("contentHtml", None)
         normalized.pop("toc", None)
+        owner_id = normalized.get("ownerId")
+        if owner_id is not None:
+            normalized["ownerId"] = str(owner_id)
         if "createdAt" in normalized:
             normalized["createdAt"] = self._ensure_timezone(normalized["createdAt"])
         if "updatedAt" in normalized:

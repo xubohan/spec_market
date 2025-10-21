@@ -16,6 +16,7 @@ class Settings:
     admin_token: str = os.getenv("ADMIN_TOKEN", "dev-admin-token")
     cors_origins: List[str] = None
     port: int = int(os.getenv("PORT", "5000"))
+    session_secret: str = os.getenv("SESSION_SECRET", "dev-session-secret")
 
     def __post_init__(self) -> None:
         origins = os.getenv("CORS_ORIGINS", "*")

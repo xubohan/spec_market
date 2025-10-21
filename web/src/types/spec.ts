@@ -6,6 +6,7 @@ export type SpecSummary = {
   category: string;
   tags: string[];
   author: string;
+  ownerId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

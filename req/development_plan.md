@@ -5,9 +5,9 @@
 > 在以下规划确认无误后，再启动具体代码实现工作。
 
 * 左侧主导航仅 **Home / Categories / Tags**，风格贴近 mcp.so。
-* **Upload** 作为临时管理入口，允许内网成员通过 Admin-Token 上传 `spec.md`（支持文本或文件）。
+* **Upload** 作为临时管理入口，允许已登录的内网成员上传 `spec.md`（支持文本或文件）。
   * Upload 表单限定仅接受 `.md` 文件：文件选择器设置 `accept=".md,text/markdown"`，提交前追加校验防止非 Markdown 文件被上传。
-* **Edit** 页面允许作者在详情页跳转后，通过 Admin-Token 再次修改 Markdown 与元信息，避免上传后才发现错误。
+* **Edit** 页面允许作者在详情页跳转后，通过登录身份再次修改 Markdown 与元信息，避免上传后才发现错误。
 * 详情页仅 **Overview**（React Markdown 渲染，滚动容器防止页面被拉长），右侧提供 **复制 Markdown**、**下载 .md**、**Meta**。
 * 不展示 Playground、不展示 MCP 配置。
 * 页面需对十几名并发访问者保持流畅；移动端可读。
@@ -89,6 +89,7 @@ web/
   * 底部：简单设置图标（预留，不实现）
 * **右侧内容区**：最大宽 1100px，居中。
 * **响应式**：<= 1024px 时侧栏可折叠，汉堡按钮展开。
+* **右上角 Top Bar**：集中展示登录入口或当前账号信息，所有写操作从此处获取登录状态。
 
 ### 页面与交互
 
@@ -117,8 +118,8 @@ web/
 
     * 📋 Copy Markdown（调用 `/api/specs/:shortId/raw` → clipboard）
     * ⬇️ Download .md（直链 `/api/specs/:shortId/download.md`）
-    * ✏️ Edit Spec（跳转 `/specs/:shortId/edit`，继续使用 Admin-Token 保护）
-    * 🗑️ Delete Spec（需先在同卡片保存 Admin-Token，删除请求携带 `X-Admin-Token`，成功后返回首页）
+    * ✏️ Edit Spec（跳转 `/specs/:shortId/edit`，需要登录）
+    * 🗑️ Delete Spec（登录后显示，成功后返回首页）
   * **Meta 卡片**：Author、Category、Tags、Updated、Created、Short ID（16 位 base62，位于标题下方并在 Meta 区域醒目展示，方便复制分享）
 
 **可及性**
@@ -129,22 +130,24 @@ web/
 
 #### 4) Spec 编辑（/specs/:shortId/edit）
 
-* 顶部显示当前 Short ID、跳转回详情页的按钮以及 Admin-Token 输入框（复用 Upload 页逻辑，保存在 localStorage）。
-* 表单字段与上传一致：Title、Category、Tags、Author、Summary、Markdown 文本，初始值来自 `useSpecDetail(shortId)`。
-* 提交时调用 `PUT /specmarket/v1/updateSpec`，Header 携带 `X-Admin-Token`；成功后提示 "Spec updated successfully." 并刷新缓存。
+* 顶部显示当前 Short ID、跳转回详情页的按钮。若访问时尚未登录，则立即重定向到统一登录页；非作者登录后仅可查看内容但无法修改。
+* 表单字段与上传一致：Title、Category、Tags、Summary、Markdown 文本，初始值来自 `useSpecDetail(shortId)`；作者信息由系统根据当前账号自动补全，页面内只读展示。
+* 提交时调用 `PUT /specmarket/v1/updateSpec`，自动携带登录态 Cookie；成功后提示 "Spec updated successfully." 并刷新缓存。
 * 表单右下角按钮在请求中显示 `Updating...`，失败提示来自后端 `status_msg`。
 
-#### Upload（Admin 工具页，仅内网）
+#### Upload（管理工具页，仅内网）
 
 * 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
 * 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
-* 表单需要额外填写 `Author` 字段，便于在详情页 Meta 区域展示上传者。
+* 上传入口位于右上角登录区域之后，未登录访问会先跳转至统一登录页。
+* 作者字段由后端根据登录用户自动生成（格式 `@username`），表单无需输入。
 
-#### Upload（Admin 工具页，仅内网）
+#### Upload（管理工具页，仅内网）
 
 * 文件上传控件 `accept=".md,text/markdown"`，并在提交前读取所选 `File` 的 `name`，若未以 `.md` 结尾（忽略大小写）立即中断提交流程并提示“Only .md files are allowed.”。
 * 若未选择文件但手动填写 Markdown 文本，则允许提交；成功上传后清空表单字段、重置文件输入和提示文案。
-* 表单需要额外填写 `Author` 字段，便于在详情页 Meta 区域展示上传者。
+* 上传入口位于右上角登录区域之后，未登录访问会先跳转至统一登录页。
+* 作者字段由后端根据登录用户自动生成（格式 `@username`），表单无需输入。
 
 ---
 
@@ -335,10 +338,10 @@ Spec {
 
 #### 4) Upload（/upload）
 
-* 顶部先输入并保存 **Admin-Token**（LocalStorage 持久化，模拟简单鉴权）。
+* 顶部展示登录面板，支持在页面内完成注册/登录，状态持久化在 Cookie 中。
 * 上传表单包含：标题、Short ID（16 位 base62 校验，输入框下方提示 `e.g. Ab3k9LmNpQr2StUv`）、类别、标签（逗号分隔）、摘要、Markdown 文本/文件（二选一）以及版本号。
 * 成功上传后清空表单并提示 `Upload successful for <shortId>`。
-* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，落盘至 `data/uploads/<shortId>.md` 并更新 Markdown。
+* 后端接收 `multipart/form-data`，读取 `content` 字段或 `file` 文件内容，写入 MongoDB 并刷新缓存。
 * 当前上传端点保持宽松：后端仍接受任意文件类型，依赖前端的 `.md` 限制；若后续需要可在 Flask 层再加 MIME/扩展名校验。
 
 ### 3) 获取原文（复制）
@@ -360,7 +363,7 @@ Spec {
 
 `POST /api/specs/upload`（实际部署可通过 Nginx rewrite → `/specmarket/v1/uploadSpec`）
 
-* Header：`X-Admin-Token`
+* Header：`Cookie: session=<value>`
 * Body：`multipart/form-data`
   * `title`、`shortId`、`category`、`summary`、`tags`、`version`
   * `content`（纯文本 Markdown，可选）
@@ -393,7 +396,7 @@ Spec {
 ```
 
 > **写接口（保留不上线）**
-> `POST /api/specs`、`PUT /api/specs/:id`（需要 `X-Admin-Token` + `version` 乐观锁）
+> `POST /api/specs`、`PUT /api/specs/:id`（需要持久化的登录 Cookie + `version` 乐观锁）
 
 #### Upload 接口（POST `/specmarket/v1/uploadSpec`）
 
@@ -421,7 +424,7 @@ Spec {
 * **CORS**：仅允许前端域名（如 `https://spec.example.com`）
 * **HTML sanitize**：后端渲染阶段用 `bleach.clean`，前端再次 DOMPurify
 * **速率限制**：公开读接口先不限制；下载接口可设 `100/min/IP`（可选）
-* **写接口保护**：`X-Admin-Token`（从环境变量读取）
+* **写接口保护**：基于会话 Cookie 的登录校验（后端保存哈希密码，不暴露明文）
 * **输入校验**：pydantic DTO（参数/分页/排序白名单）
 
 ---
