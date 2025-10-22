@@ -7,6 +7,13 @@
 
 # Fix Log
 
+## Upload markdown/file mutual exclusion
+
+- **Date**: 2025-10-24
+- **Motivation**: Upload 页面允许同时填写 Markdown 与选择文件，容易误触并触发后端校验失败，且提示样式与编辑页不一致。
+- **Implementation**: 通过前端 `inputMode` 状态在用户输入 Markdown 时禁用文件控件，选择文件时自动清空并禁用文本域，同时新增英文提示文案确保“输入与上传二选一”；详情页复制 Short ID 的成功/失败提示改为与编辑页一致的柔和提示框。
+- **Verification**: `npm run build`，手动在 Upload 页面切换输入/上传互斥状态并尝试双提交校验，在 Spec Detail 页面复制 Short ID 观察提示样式，更新截图存档。
+
 ## Version history tracking for specs
 
 - **Date**: 2025-10-22

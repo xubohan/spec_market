@@ -66,7 +66,8 @@ export const SpecDetailPage = () => {
   const isVersionLoadingState = Boolean(targetVersion && isVersionLoading);
 
   if (isLoading) {
-    return <p className="text-muted">Loading...</p>;
+    return <p className="text-muted"> </p>;
+    // 暂时不设置内容，用户视觉更流程
   }
 
   if (!data) {
@@ -240,7 +241,8 @@ export const SpecDetailPage = () => {
           </div>
           {message && (
             <p
-              className={`mt-4 text-xs ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}
+              role="status"
+              className="mt-4 rounded-xl border border-muted/20 bg-white/80 px-3 py-2 text-xs font-medium text-muted"
             >
               {message.text}
             </p>

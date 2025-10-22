@@ -18,7 +18,7 @@ export const SpecCard = ({ spec }: { spec: SpecSummary }) => {
         </div>
       </div>
       <div className="mt-4 text-xs text-muted">
-        Updated {new Date(spec.updatedAt).toLocaleDateString()} · {spec.author}
+        Updated {new Date(spec.updatedAt).toLocaleDateString()} · V{spec.version} · {spec.author} 
       </div>
     </div>
   );
