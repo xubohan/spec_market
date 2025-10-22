@@ -34,7 +34,7 @@ export const HomePage = () => {
       {!isLoading && specs.length > 0 && (
         <div className="grid gap-6 md:grid-cols-2">
           {specs.map((spec) => (
-            <SpecCard key={spec.id} spec={spec} />
+            <SpecCard key={spec.shortId} spec={spec} />
           ))}
         </div>
       )}

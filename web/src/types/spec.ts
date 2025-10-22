@@ -1,5 +1,4 @@
 export type SpecSummary = {
-  id: string;
   title: string;
   shortId: string;
   summary: string;

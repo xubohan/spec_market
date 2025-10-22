@@ -18,7 +18,7 @@ export const CategoryListPage = () => {
       {!isLoading && data?.items?.length && (
         <div className="grid gap-6 md:grid-cols-2">
           {data.items.map((spec) => (
-            <SpecCard key={spec.id} spec={spec} />
+            <SpecCard key={spec.shortId} spec={spec} />
           ))}
         </div>
       )}

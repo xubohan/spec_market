@@ -403,12 +403,10 @@ def create_app() -> Flask:
             short_id = payload.shortId or generate_short_id()
             while repository.get_spec(short_id):
                 short_id = generate_short_id()
-        spec_id = existing.id if existing else f"spec-{short_id}"
         owner_id = existing.ownerId if existing and existing.ownerId else user.id
         author = f"@{user.username}"
         version = existing.version + 1 if existing else 1
         spec = Spec(
-            id=spec_id,
             title=payload.title,
             shortId=short_id,
             summary=payload.summary,
@@ -434,7 +432,7 @@ def create_app() -> Flask:
                 "Failed to persist spec",
                 500,
             )
-        return response_payload({"id": spec.id, "shortId": spec.shortId, "version": spec.version}, 201)
+        return response_payload({"shortId": spec.shortId, "version": spec.version}, 201)
 
     @app.route("/specmarket/v1/updateSpec", methods=["PUT"])
     @require_login
@@ -467,7 +465,6 @@ def create_app() -> Flask:
         content_md = payload.contentMd
         version = existing.version + 1
         spec = Spec(
-            id=existing.id,
             title=payload.title,
             shortId=existing.shortId,
             summary=payload.summary,

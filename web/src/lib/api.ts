@@ -250,7 +250,7 @@ export const useUploadSpec = () =>
         body: payload.formData,
         cache: 'no-store',
       });
-      return extractApiData<{ id: string; shortId: string }>(response);
+      return extractApiData<{ shortId: string; version: number }>(response);
     },
   });
 
@@ -285,7 +285,7 @@ export const useUpdateSpec = () => {
         }),
         cache: 'no-store',
       });
-      return extractApiData<{ shortId: string; updatedAt: string }>(response);
+      return extractApiData<{ shortId: string; updatedAt: string; version: number }>(response);
     },
     onSuccess: (result, variables) => {
       const updatedAt = result.updatedAt;
@@ -303,6 +303,7 @@ export const useUpdateSpec = () => {
           tags: variables.tags,
           contentMd: variables.contentMd,
           updatedAt,
+          version: result.version,
         };
       });
 
@@ -322,6 +323,7 @@ export const useUpdateSpec = () => {
                   category: variables.category,
                   tags: variables.tags,
                   updatedAt,
+                  version: result.version,
                 }
               : item,
           ),

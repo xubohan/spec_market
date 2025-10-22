@@ -14,6 +14,13 @@
 - **Implementation**: 通过前端 `inputMode` 状态在用户输入 Markdown 时禁用文件控件，选择文件时自动清空并禁用文本域，同时新增英文提示文案确保“输入与上传二选一”；详情页复制 Short ID 的成功/失败提示改为与编辑页一致的柔和提示框。
 - **Verification**: `npm run build`，手动在 Upload 页面切换输入/上传互斥状态并尝试双提交校验，在 Spec Detail 页面复制 Short ID 观察提示样式，更新截图存档。
 
+## Short ID-only spec identifiers
+
+- **Date**: 2025-10-24
+- **Motivation**: 后端与前端仍然混用自增 `id` 与 `shortId` 两套标识，上传接口返回 `{ id, shortId }` 导致契约混乱且 Spec Detail/列表 key 不稳定。短链已经全局唯一，应完全淘汰冗余 `id` 字段。
+- **Implementation**: 删除 `Spec`/`SpecSummary`/`SpecMetadata` 的 `id` 字段，Repository 归一化逻辑与 Mongo 文档不再生成该字段，上传与更新接口仅返回 `{ shortId, version, updatedAt }`。前端类型、React key、上传/更新 mutation payload 对齐短链契约，并更新契约文档说明。
+- **Verification**: `pytest backend/tests/test_api.py`、`npm run build`，手动验证上传/更新后详情页与列表渲染正常，Short ID 仍可复制与跳转。
+
 ## Version history tracking for specs
 
 - **Date**: 2025-10-22

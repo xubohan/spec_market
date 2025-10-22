@@ -77,6 +77,7 @@ class SpecRepository:
         normalized.pop("uploadedAt", None)
         normalized.pop("contentHtml", None)
         normalized.pop("toc", None)
+        normalized.pop("id", None)
         if "shortId" not in normalized or not is_valid_short_id(str(normalized["shortId"])):
             legacy_slug = normalized.get("slug") or normalized.get("shortId")
             if not legacy_slug:
@@ -84,7 +85,6 @@ class SpecRepository:
             normalized["shortId"] = derive_short_id(str(legacy_slug))
         short_id = str(normalized["shortId"])
         normalized["shortId"] = short_id
-        normalized["id"] = str(normalized.get("id") or f"spec-{short_id}")
         normalized.pop("slug", None)
         normalized["title"] = str(normalized.get("title", ""))
         normalized["summary"] = str(normalized.get("summary", ""))
@@ -118,7 +118,6 @@ class SpecRepository:
     def _metadata_from_raw(self, raw: Dict[str, Any]) -> SpecMetadata:
         normalized = self._normalize_metadata_fields(raw)
         return SpecMetadata(
-            id=str(normalized["id"]),
             title=normalized["title"],
             shortId=normalized["shortId"],
             summary=normalized["summary"],
@@ -133,7 +132,6 @@ class SpecRepository:
 
     def _metadata_from_spec(self, spec: Spec) -> SpecMetadata:
         return SpecMetadata(
-            id=spec.id,
             title=spec.title,
             shortId=spec.shortId,
             summary=spec.summary,
@@ -169,7 +167,6 @@ class SpecRepository:
 
     def _combine_metadata_and_version(self, metadata: SpecMetadata, version: SpecVersion) -> Spec:
         return Spec(
-            id=metadata.id,
             title=version.title,
             shortId=metadata.shortId,
             summary=version.summary,

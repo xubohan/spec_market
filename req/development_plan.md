@@ -368,7 +368,7 @@ Spec {
   * `title`、`shortId`、`category`、`summary`、`tags`、`version`
   * `content`（纯文本 Markdown，可选）
   * `file`（Markdown 文件，可选；当 `content` 为空时必填）
-* 成功返回 `201` + `{ "status_code": 0, "status_msg": "Created", "data": { "id": "...", "shortId": "Ab3k9LmNpQr2StUv" } }`
+* 成功返回 `201` + `{ "status_code": 0, "status_msg": "Created", "data": { "shortId": "Ab3k9LmNpQr2StUv", "version": 1 } }`
 * 失败返回标准错误模型（401/400 等），错误响应同样包装在 `{ status_code, status_msg, data }` 中，`data` 至少为空对象或包含字段错误详情。
 
 `GET /api/categories` →

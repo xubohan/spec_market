@@ -37,7 +37,6 @@ SHORT_ID_ERROR = f"shortId must be a {SHORT_ID_LENGTH}-character base62 string"
 
 
 class Spec(BaseModel):
-    id: str
     title: str
     shortId: str
     summary: str
@@ -61,7 +60,6 @@ class Spec(BaseModel):
 
 
 class SpecSummary(BaseModel):
-    id: str
     title: str
     shortId: str
     summary: str
@@ -119,7 +117,6 @@ class SpecHistoryItem(BaseModel):
 
 
 class SpecMetadata(BaseModel):
-    id: str
     title: str
     shortId: str
     summary: str
@@ -236,7 +233,6 @@ def spec_metadata_to_document(spec: Spec | SpecMetadata) -> Dict[str, Any]:
         source = spec.dict(by_alias=True)
 
     document = {
-        "id": source.get("id") or f"spec-{source['shortId']}",
         "shortId": source["shortId"],
         "title": source["title"],
         "summary": source["summary"],

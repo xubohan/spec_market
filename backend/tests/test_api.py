@@ -122,7 +122,6 @@ def test_list_specs_filter_today_handles_naive_documents(client):
     naive_created = datetime.now(timezone.utc).replace(tzinfo=None)
     naive_updated = datetime.now(timezone.utc).replace(tzinfo=None)
     metadata_doc = {
-        "id": "spec-2",
         "title": "Naive datetime spec",
         "shortId": "B7C8D9E0F1G2H3I4",
         "summary": "Summary",
@@ -217,7 +216,6 @@ def test_upload_spec(client):
     assert isinstance(collection, mongo_module._InMemoryCollection)
     stored = collection.store[returned_short_id]
     expected_keys = {
-        "id",
         "shortId",
         "title",
         "summary",
@@ -413,7 +411,6 @@ def test_update_spec_endpoint(client):
     assert stored["author"] == "@tester"
     assert stored["ownerId"] == user_id
     assert set(stored.keys()) == {
-        "id",
         "shortId",
         "title",
         "summary",
