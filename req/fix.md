@@ -14,6 +14,13 @@
 - **Implementation**: 通过前端 `inputMode` 状态在用户输入 Markdown 时禁用文件控件，选择文件时自动清空并禁用文本域，同时新增英文提示文案确保“输入与上传二选一”；详情页复制 Short ID 的成功/失败提示改为与编辑页一致的柔和提示框。
 - **Verification**: `npm run build`，手动在 Upload 页面切换输入/上传互斥状态并尝试双提交校验，在 Spec Detail 页面复制 Short ID 观察提示样式，更新截图存档。
 
+## Absolute imports for backend runtime
+
+- **Date**: 2024-11-05
+- **Motivation**: Gunicorn 无法解析包内的相对引用，导致启动报错，需要将后端模块切换为绝对导入并统一包名。
+- **Implementation**: 在保留 `ai-infra-backend` 目录名的前提下，将核心代码迁移到合法包名 `ai_infra_backend` 下，并更新 Dockerfile 设置 `PYTHONPATH` 以便 Gunicorn 通过绝对导入启动。
+- **Verification**: `pytest ai-infra-backend/ai_infra_backend/tests`
+
 ## Short ID-only spec identifiers
 
 - **Date**: 2025-10-24

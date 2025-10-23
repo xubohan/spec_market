@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import re
 from pydantic import BaseModel, Field, validator
-from .utils import BASE62_ALPHABET, SHORT_ID_LENGTH
+from ai_infra_backend.utils import BASE62_ALPHABET, SHORT_ID_LENGTH
 
 
 @unique

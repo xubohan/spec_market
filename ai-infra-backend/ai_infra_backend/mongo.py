@@ -12,7 +12,7 @@ from bson.errors import InvalidId
 from pymongo import MongoClient, errors
 from pymongo.collection import Collection
 
-from .config import settings
+from ai_infra_backend.config import settings
 
 _client: MongoClient | None = None
 _collection: Collection | "_InMemorySpecCollection" | None = None

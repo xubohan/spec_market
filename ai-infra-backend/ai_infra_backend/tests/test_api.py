@@ -3,8 +3,8 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 
-from backend.models import BusinessErrorCode
-from backend import mongo as mongo_module
+from ai_infra_backend.models import BusinessErrorCode
+from ai_infra_backend import mongo as mongo_module
 
 
 TEST_USERNAME = "tester"
@@ -116,7 +116,7 @@ def test_list_specs(client):
 
 
 def test_list_specs_filter_today_handles_naive_documents(client):
-    from backend import repository as repository_module
+    from ai_infra_backend import repository as repository_module
 
     repo = repository_module.repository
     naive_created = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -531,7 +531,7 @@ def test_delete_spec_endpoint(client):
     assert detail.status_code == 404
     assert detail.get_json()["status_code"] == BusinessErrorCode.NOT_FOUND
 
-    from backend import repository as repository_module
+    from ai_infra_backend import repository as repository_module
 
     assert repository_module.repository.get_spec(short_id) is None
 

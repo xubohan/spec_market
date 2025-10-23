@@ -14,11 +14,11 @@ if str(ROOT) not in sys.path:
 
 import importlib
 
-app_module = importlib.import_module("backend.app")
-repository_module = importlib.import_module("backend.repository")
-mongo_module = importlib.import_module("backend.mongo")
-from backend.app import create_app
-from backend.repository import SpecRepository
+app_module = importlib.import_module("ai_infra_backend.app")
+repository_module = importlib.import_module("ai_infra_backend.repository")
+mongo_module = importlib.import_module("ai_infra_backend.mongo")
+from ai_infra_backend.app import create_app
+from ai_infra_backend.repository import SpecRepository
 
 
 @pytest.fixture(autouse=True)

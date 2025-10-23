@@ -13,8 +13,8 @@ from flask_cors import CORS
 from pymongo import errors as pymongo_errors
 from pydantic import ValidationError
 
-from .config import settings
-from .models import (
+from ai_infra_backend.config import settings
+from ai_infra_backend.models import (
     APIResponse,
     BusinessErrorCode,
     Spec,
@@ -25,7 +25,7 @@ from .models import (
     spec_metadata_to_document,
     spec_version_to_document,
 )
-from .mongo import (
+from ai_infra_backend.mongo import (
     create_user_document,
     delete_spec_document,
     delete_spec_versions,
@@ -35,8 +35,8 @@ from .mongo import (
     save_spec_version_document,
     update_user_timestamp,
 )
-from .repository import repository
-from .utils import derive_short_id, generate_short_id
+from ai_infra_backend.repository import repository
+from ai_infra_backend.utils import derive_short_id, generate_short_id
 
 
 def create_app() -> Flask:

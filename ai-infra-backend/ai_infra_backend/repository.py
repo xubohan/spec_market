@@ -10,7 +10,7 @@ import logging
 
 from pymongo import errors as pymongo_errors
 
-from .models import (
+from ai_infra_backend.models import (
     Category,
     PaginatedSpecs,
     Spec,
@@ -20,13 +20,13 @@ from .models import (
     SpecVersion,
     Tag,
 )
-from .mongo import (
+from ai_infra_backend.mongo import (
     find_latest_spec_version_document,
     find_spec_version_document,
     list_spec_documents,
     list_spec_version_documents,
 )
-from .utils import derive_short_id, is_valid_short_id, slugify
+from ai_infra_backend.utils import derive_short_id, is_valid_short_id, slugify
 
 DATA_DIR = Path(__file__).parent / "data"
 

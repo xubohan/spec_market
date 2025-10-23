@@ -15,7 +15,9 @@ Spec Market 是一个用于浏览、搜索与管理产品/技术规格文档的�
 
 ```
 spec_market/
-├── backend/    # Flask API：列表、详情、下载、上传等接口
+├── ai-infra-backend/
+│   ├── ai_infra_backend/  # Flask API：列表、详情、下载、上传等接口
+│   └── deploy/            # Dockerfile 及部署脚本
 ├── web/        # React 18 + Vite 前端，集成 TanStack Query、Tailwind CSS
 └── req/        # 产品/设计文档（含 development_plan.md）
 ```
@@ -25,13 +27,13 @@ spec_market/
 ### 后端（Flask）
 
 ```bash
-cd backend
+cd ai-infra-backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env  # 可选：快速填充本地环境变量
 export ADMIN_TOKEN="your-admin-token"
-flask --app app run --port 8000
+flask --app ai_infra_backend.app run --port 8000
 ```
 
 API 默认挂在 `/specmarket/v1`，上传接口为 `POST /specmarket/v1/uploadSpec`，需要在 Header 中附带 `X-Admin-Token`。查询、详情、复制与下载等接口全部改用 `shortId` 作为路径参数（例如 `GET /specmarket/v1/specs/{shortId}`、`GET /specmarket/v1/specs/{shortId}/raw`），请同步更新任何依赖旧 slug 的客户端或脚本。
@@ -69,4 +71,4 @@ Vite dev server 会通过代理访问本地 API，浏览器访问 `http://localh
 ## 更多文档
 
 * [`req/development_plan.md`](req/development_plan.md)：前端页面结构、交互及接口契约。
-* `backend/tests/`：覆盖 API 的基础单元测试示例。
+* `ai-infra-backend/ai_infra_backend/tests/`：覆盖 API 的基础单元测试示例。
