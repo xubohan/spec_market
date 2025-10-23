@@ -12,6 +12,8 @@ from flask import Flask, Response, make_response, request, g, session
 from flask_cors import CORS
 from pymongo import errors as pymongo_errors
 from pydantic import ValidationError
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 from ai_infra_backend.config import settings
 from ai_infra_backend.models import (
@@ -499,6 +501,25 @@ def create_app() -> Flask:
     def healthz():
         uptime_seconds = (datetime.now(timezone.utc) - datetime.fromtimestamp(app.start_time, tz=timezone.utc)).total_seconds()
         return response_payload({"ok": True, "mongo": False, "uptime": uptime_seconds})
+    
+    @app.route("/readiness")
+    def readiness():
+        # 计算启动到现在的时间
+        uptime_seconds = (datetime.now(timezone.utc) - datetime.fromtimestamp(app.start_time, tz=timezone.utc)).total_seconds()
+
+        mongo_ready = False
+        try:
+            client = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=500)
+            client.admin.command("ping")  # 尝试连接
+            mongo_ready = True
+        except PyMongoError:
+            mongo_ready = False
+        finally:
+            if 'client' in locals():
+                client.close()
+
+        ok = mongo_ready
+        return response_payload({"ok": ok, "mongo": mongo_ready, "uptime": uptime_seconds})
 
     @app.errorhandler(404)
     def not_found(error):  # type: ignore[override]
