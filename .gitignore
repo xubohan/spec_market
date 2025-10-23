@@ -1,12 +1,13 @@
 **/__pycache__/
 *.pyc
 node_modules/
-web/node_modules/
-web/dist/
+ai-infra-fronted/node_modules/
+ai-infra-fronted/dist/
 .venv/
-backend/.venv/
+ai-infra-backend/.venv/
 .pytest_cache/
 *.tsbuildinfo
 .env
 .DS_Store
 req/.DS_Store
+dist/

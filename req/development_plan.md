@@ -1,5 +1,9 @@
 # 前端设计文档（Spec 文档市场 · Web）
 
+## 更新记录
+
+* 2025-10-23：前端代码目录统一为 `ai-infra-frontend/`，新增 `deploy/Dockerfile` 与 `deploy/nginx.conf` 以支持多阶段构建和 Nginx 托管，补充 `.dockerignore` 避免将 `node_modules` 打入镜像。
+
 ## 目标与范围（MVP）
 
 > 在以下规划确认无误后，再启动具体代码实现工作。
@@ -32,7 +36,7 @@
 **目录建议**
 
 ```
-web/
+ai-infra-frontend/
   src/
     app/
       routes.tsx
@@ -470,7 +474,16 @@ PORT=5000
 
 * `mongo`（持久卷）
 * `api`（Flask，暴露 5000，依赖 mongo）
-* `web`（静态站：Nginx 反代 `/api` 到 `api:5000`）
+* `ai-infra-frontend`（静态站：Nginx 反代 `/api` 到 `api:5000`）
+
+**前端镜像构建**
+
+```bash
+cd ai-infra-frontend
+docker build -f deploy/Dockerfile -t spec-market-frontend:latest .
+```
+
+`deploy/Dockerfile` 负责使用 Node.js 多阶段构建生成 `dist/` 静态资源，并将其复制到 `nginx:alpine` 镜像中；`deploy/nginx.conf` 暴露 `/healthz` 健康检查并通过 `try_files` 兜底 SPA 路由。`.dockerignore` 排除 `node_modules`、临时文件，确保镜像体积可控。
 
 **初始化与索引**
 

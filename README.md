@@ -18,7 +18,7 @@ spec_market/
 ├── ai-infra-backend/
 │   ├── ai_infra_backend/  # Flask API：列表、详情、下载、上传等接口
 │   └── deploy/            # Dockerfile 及部署脚本
-├── web/        # React 18 + Vite 前端，集成 TanStack Query、Tailwind CSS
+├── ai-infra-frontend/  # React 18 + Vite 前端，集成 TanStack Query、Tailwind CSS 与部署脚本
 └── req/        # 产品/设计文档（含 development_plan.md）
 ```
 
@@ -61,12 +61,12 @@ MONGODB_DB=specdb
 ### 前端（Vite）
 
 ```bash
-cd web
+cd ai-infra-frontend
 npm install
 npm run dev
 ```
 
-Vite dev server 会通过代理访问本地 API，浏览器访问 `http://localhost:5173`，即可体验浏览、搜索及上传流程。
+Vite dev server 会通过代理访问本地 API，浏览器访问 `http://localhost:5173`，即可体验浏览、搜索及上传流程。若需生产部署，可参考 `ai-infra-frontend/deploy/Dockerfile` 使用多阶段构建生成静态资源并通过 Nginx 提供服务。
 
 ## 更多文档
 

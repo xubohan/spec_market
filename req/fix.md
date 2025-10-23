@@ -7,6 +7,13 @@
 
 # Fix Log
 
+## Frontend Docker delivery pipeline
+
+- **Date**: 2025-10-23
+- **Motivation**: 原有前端仅支持本地开发，缺少可复用的容器化流程，且目录命名与后端不一致，CI/CD 无法直接引用。
+- **Implementation**: 将前端目录统一为 `ai-infra-frontend/`，新增 `.dockerignore`、`deploy/Dockerfile` 与 `deploy/nginx.conf`。Dockerfile 通过 Node 20 Alpine 构建 `dist/`，再用 Nginx 运行时镜像托管静态资源并提供 `/healthz`，同时在部署文档中明确镜像构建命令。
+- **Verification**: `npm run build` 验证产物生成，通过 Vite dev server (`npm run dev -- --host 0.0.0.0 --port 5173`) 启动并截图页面展示；尝试执行 `docker build -f deploy/Dockerfile -t spec-frontend:local .` 以验证容器配置（当前环境无 Docker 命令需在具备 Docker 的 CI 环境复现）。
+
 ## Upload markdown/file mutual exclusion
 
 - **Date**: 2025-10-24
