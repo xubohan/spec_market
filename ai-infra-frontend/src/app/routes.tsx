@@ -51,7 +51,8 @@ function ErrorState() {
   );
 }
 
-export const router = createBrowserRouter([
+// ✅ 路由表（保持不变）
+const routes = [
   {
     path: '/',
     element: <AppLayout />,
@@ -65,7 +66,11 @@ export const router = createBrowserRouter([
       { path: 'specs/:shortId', element: <SpecDetailPage /> },
       { path: 'specs/:shortId/edit', element: <EditSpecPage /> },
       { path: 'upload', element: <UploadPage /> },
-      { path: 'login', element: <LoginPage /> }
+      { path: 'login', element: <LoginPage /> },
     ],
   },
-]);
+];
+
+// ✅ 新增：导出工厂函数，用于 main.tsx 调用
+export const makeRouter = (basename: string) =>
+  createBrowserRouter(routes, { basename });
